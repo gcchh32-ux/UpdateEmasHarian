@@ -26,13 +26,13 @@ jobs:
       - name: 🎬 Install FFmpeg
         run: sudo apt-get install -y ffmpeg
 
-      - name: 📦 Install dependencies Python
+       - name: 📦 Install dependencies Python
         run: |
-          pip install requests
-          pip install beautifulsoup4
-          pip install edge-tts
-          pip install google-api-python-client
-          pip install google-auth-oauthlib
+          pip install requests beautifulsoup4 edge-tts google-api-python-client google-auth-oauthlib Pillow
+
+      - name: 🎨 Install font untuk thumbnail
+        run: sudo apt-get install -y fonts-open-sans fonts-liberation || true
+
 
       - name: 🔑 Setup semua credentials
         env:
@@ -76,3 +76,4 @@ jobs:
           name: video-emas-${{ github.run_number }}
           path: "Video_Emas_*.mp4"
           retention-days: 3
+

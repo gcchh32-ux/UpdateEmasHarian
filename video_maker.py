@@ -721,4 +721,6 @@ async def main():
 if __name__ == "__main__":
     asyncio.run(main())
     print("\n" + "="*60)
-    input("Tekan ENTER untuk keluar...")
+    # Tidak perlu input() — script selesai otomatis di GitHub Actions
+
+

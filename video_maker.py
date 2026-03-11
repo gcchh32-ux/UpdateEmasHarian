@@ -38,7 +38,7 @@ from bs4 import BeautifulSoup
 # ============================================================
 GEMINI_API_KEY    = os.environ.get("GEMINI_API_KEY",  "AIzaSyByVL2l_ztr8Qar1jXMN3iwa07kB8SEUsA")
 PEXELS_API_KEY    = os.environ.get("PEXELS_API_KEY",  "NWTuol4cK2LArc6FynRtRFwg9i9dySJxFe1yYiCqi6Eobu0UR0oTeNOR")
-NAMA_CHANNEL      = "Sobat Emas"
+NAMA_CHANNEL      = "Sobat Antam"
 FFMPEG_LOG        = "ffmpeg_log.txt"
 YOUTUBE_CATEGORY  = "25"   # 25 = News & Politics
 YOUTUBE_TAGS      = ["harga emas", "emas antam", "investasi emas",
@@ -722,5 +722,6 @@ if __name__ == "__main__":
     asyncio.run(main())
     print("\n" + "="*60)
     # Tidak perlu input() — script selesai otomatis di GitHub Actions
+
 
 

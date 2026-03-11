@@ -52,3 +52,4 @@ jobs:
           name: video-emas-${{ github.run_number }}
           path: "Video_Emas_*.mp4"
           retention-days: 3
+

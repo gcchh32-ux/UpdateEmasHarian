@@ -1,5 +1,6 @@
 # =============================================================
-# AUTO VIDEO EMAS - FULL AUTOMATION v3.0
+# AUTO VIDEO EMAS - FULL AUTOMATION v4.0
+# Sobat Antam - by arsantoid
 # =============================================================
 import sys, subprocess, os, glob, random, re, json, shutil, time
 from datetime import datetime, timedelta
@@ -12,90 +13,85 @@ def pastikan_library_terinstall():
         from bs4 import BeautifulSoup
         import edge_tts
         from googleapiclient.discovery import build
+        from PIL import Image, ImageDraw, ImageFont, ImageFilter
     except ImportError:
         print("Menginstal library...")
         subprocess.check_call([sys.executable, "-m", "pip", "install",
             "requests", "beautifulsoup4", "edge-tts",
-            "google-api-python-client", "google-auth-oauthlib"])
+            "google-api-python-client", "google-auth-oauthlib", "Pillow"])
 
 pastikan_library_terinstall()
 import requests
 from bs4 import BeautifulSoup
 
 # ============================================================
-# PENGATURAN UTAMA
+# PENGATURAN UTAMA — ISI BAGIAN INI
 # ============================================================
-GEMINI_API_KEY   = os.environ.get("GEMINI_API_KEY",  "")
-PEXELS_API_KEY   = os.environ.get("PEXELS_API_KEY",  "")
-NAMA_CHANNEL     = "Sobat Antam"
-FFMPEG_LOG       = "ffmpeg_log.txt"
-FILE_HISTORY     = "history_harga.json"
-YOUTUBE_CATEGORY = "25"
-YOUTUBE_TAGS     = ["harga emas", "emas antam", "investasi emas",
-                    "logam mulia", "harga emas hari ini", "emas antam hari ini"]
+GEMINI_API_KEY    = os.environ.get("GEMINI_API_KEY",  "")
+PEXELS_API_KEY    = os.environ.get("PEXELS_API_KEY",  "")
+NAMA_CHANNEL      = "Sobat Antam"
+FFMPEG_LOG        = "ffmpeg_log.txt"
+FILE_HISTORY      = "history_harga.json"
+YOUTUBE_CATEGORY  = "25"
+YOUTUBE_TAGS      = ["harga emas", "emas antam", "investasi emas",
+                     "logam mulia", "harga emas hari ini", "emas antam hari ini",
+                     "harga emas antam", "update emas", "emas batangan"]
 KATA_KUNCI_GAMBAR = ["gold bars", "gold investment", "precious metals",
                      "gold coins", "financial gold", "gold bullion",
                      "gold price", "gold trading", "gold market", "wealth gold"]
 
-# ── Manajemen storage ─────────────────────────────────────────
-FOLDER_GAMBAR     = "gambar_bank"     # folder bank gambar permanen
-JUMLAH_GAMBAR_MIN = 50                # download ulang jika di bawah angka ini
-JUMLAH_GAMBAR_MAX = 200               # hapus gambar lama jika melebihi ini
-JUMLAH_DL_SEKALI  = 80               # jumlah gambar didownload sekali jalan
-SIMPAN_VIDEO_MAKS = 3                 # simpan maksimal N video terakhir secara lokal
+# Manajemen storage
+FOLDER_GAMBAR     = "gambar_bank"
+JUMLAH_GAMBAR_MIN = 50
+JUMLAH_GAMBAR_MAX = 200
+JUMLAH_DL_SEKALI  = 80
+SIMPAN_VIDEO_MAKS = 3
 # ============================================================
 
 
 # ════════════════════════════════════════════════════════════
-# BAGIAN 1: MANAJEMEN STORAGE
+# BAGIAN 1 — MANAJEMEN STORAGE
 # ════════════════════════════════════════════════════════════
 
 def kelola_bank_gambar():
-    """
-    Kelola folder gambar_bank:
-    - Jika gambar < JUMLAH_GAMBAR_MIN → download batch baru dari Pexels
-    - Jika gambar > JUMLAH_GAMBAR_MAX → hapus gambar paling lama
-    - Return list path gambar yang tersedia
-    """
     os.makedirs(FOLDER_GAMBAR, exist_ok=True)
-    gambar_ada = sorted(glob.glob(f"{FOLDER_GAMBAR}/*.jpg") +
-                        glob.glob(f"{FOLDER_GAMBAR}/*.jpeg") +
-                        glob.glob(f"{FOLDER_GAMBAR}/*.png"))
-
+    gambar_ada = sorted(
+        glob.glob(f"{FOLDER_GAMBAR}/*.jpg") +
+        glob.glob(f"{FOLDER_GAMBAR}/*.jpeg") +
+        glob.glob(f"{FOLDER_GAMBAR}/*.png")
+    )
     print(f"[STORAGE] Bank gambar: {len(gambar_ada)} file di '{FOLDER_GAMBAR}/'")
 
-    # Download batch jika kurang
     if len(gambar_ada) < JUMLAH_GAMBAR_MIN:
         kurang = JUMLAH_DL_SEKALI - len(gambar_ada)
         print(f"[STORAGE] Gambar kurang dari {JUMLAH_GAMBAR_MIN}. Download {kurang} gambar baru...")
-        gambar_baru = _download_pexels_batch(kurang)
-        gambar_ada  = sorted(glob.glob(f"{FOLDER_GAMBAR}/*.jpg") +
-                             glob.glob(f"{FOLDER_GAMBAR}/*.jpeg") +
-                             glob.glob(f"{FOLDER_GAMBAR}/*.png"))
+        _download_pexels_batch(kurang)
+        gambar_ada = sorted(
+            glob.glob(f"{FOLDER_GAMBAR}/*.jpg") +
+            glob.glob(f"{FOLDER_GAMBAR}/*.jpeg") +
+            glob.glob(f"{FOLDER_GAMBAR}/*.png")
+        )
         print(f"[STORAGE] Bank gambar sekarang: {len(gambar_ada)} file")
     else:
-        print(f"[STORAGE] Bank gambar cukup. Tidak perlu download.")
+        print(f"[STORAGE] Bank gambar cukup.")
 
-    # Hapus gambar terlama jika melebihi batas
     if len(gambar_ada) > JUMLAH_GAMBAR_MAX:
         jumlah_hapus = len(gambar_ada) - JUMLAH_GAMBAR_MAX
-        to_hapus     = gambar_ada[:jumlah_hapus]  # hapus yang paling lama (sort by name)
-        for f in to_hapus:
+        for f in gambar_ada[:jumlah_hapus]:
             try:
                 os.remove(f)
             except Exception:
                 pass
-        print(f"[STORAGE] Hapus {jumlah_hapus} gambar lama. Bank tersisa: {JUMLAH_GAMBAR_MAX}")
+        print(f"[STORAGE] Hapus {jumlah_hapus} gambar lama.")
         gambar_ada = gambar_ada[jumlah_hapus:]
 
     return gambar_ada
 
 
 def _download_pexels_batch(jumlah_target):
-    """Download gambar dari Pexels, tersebar dari berbagai keyword."""
     if not PEXELS_API_KEY:
         print("  -> Pexels API key kosong. Skip download.")
-        return []
+        return 0
 
     headers     = {"Authorization": PEXELS_API_KEY}
     per_keyword = max(10, jumlah_target // len(KATA_KUNCI_GAMBAR))
@@ -109,43 +105,33 @@ def _download_pexels_batch(jumlah_target):
             resp = requests.get(url, headers=headers, timeout=15)
             resp.raise_for_status()
             fotos = resp.json().get("photos", [])
-
             for i, foto in enumerate(fotos):
                 img_url  = foto["src"]["large2x"]
-                filename = f"{FOLDER_GAMBAR}/pexels_{ts_base}_{keyword.replace(' ','_')}_{i+1}.jpg"
-
-                # Skip jika sudah ada file serupa (cegah duplikat keyword)
+                filename = (f"{FOLDER_GAMBAR}/pexels_{ts_base}_"
+                            f"{keyword.replace(' ','_')}_{i+1}.jpg")
                 if os.path.exists(filename):
                     continue
-
                 try:
                     img_data = requests.get(img_url, timeout=30).content
                     with open(filename, "wb") as f:
                         f.write(img_data)
                     total_dl += 1
-                except Exception as e:
-                    print(f"  -> Gagal download {img_url}: {e}")
-
+                except Exception:
+                    pass
             print(f"  -> '{keyword}': {len(fotos)} gambar OK")
             if total_dl >= jumlah_target:
                 break
-
         except Exception as e:
-            print(f"  -> Gagal fetch keyword '{keyword}': {e}")
+            print(f"  -> Gagal fetch '{keyword}': {e}")
 
-    print(f"  -> Total download: {total_dl} gambar baru ke '{FOLDER_GAMBAR}/'")
+    print(f"  -> Total download: {total_dl} gambar baru")
     return total_dl
 
 
 def kelola_video_lama():
-    """
-    Hapus video lama, simpan hanya SIMPAN_VIDEO_MAKS video terbaru.
-    Panggil SEBELUM render agar tidak memenuhi storage.
-    """
     videos = sorted(glob.glob("Video_Emas_*.mp4"))
     if len(videos) > SIMPAN_VIDEO_MAKS:
-        hapus  = videos[:len(videos) - SIMPAN_VIDEO_MAKS]
-        for v in hapus:
+        for v in videos[:len(videos) - SIMPAN_VIDEO_MAKS]:
             try:
                 os.remove(v)
                 print(f"[STORAGE] Hapus video lama: {v}")
@@ -154,15 +140,12 @@ def kelola_video_lama():
 
 
 def ringkasan_storage():
-    """Tampilkan ringkasan penggunaan storage."""
     gambar_ada = (glob.glob(f"{FOLDER_GAMBAR}/*.jpg") +
                   glob.glob(f"{FOLDER_GAMBAR}/*.jpeg") +
                   glob.glob(f"{FOLDER_GAMBAR}/*.png"))
-    videos     = glob.glob("Video_Emas_*.mp4")
-
+    videos = glob.glob("Video_Emas_*.mp4")
     ukuran_gambar = sum(os.path.getsize(f) for f in gambar_ada if os.path.exists(f))
-    ukuran_video  = sum(os.path.getsize(f) for f in videos if os.path.exists(f))
-
+    ukuran_video  = sum(os.path.getsize(f) for f in videos  if os.path.exists(f))
     print(f"\n[STORAGE] Ringkasan:")
     print(f"  → Bank gambar : {len(gambar_ada)} file ({ukuran_gambar/1024/1024:.1f} MB)")
     print(f"  → Video lokal : {len(videos)} file ({ukuran_video/1024/1024:.1f} MB)")
@@ -170,7 +153,7 @@ def ringkasan_storage():
 
 
 # ════════════════════════════════════════════════════════════
-# BAGIAN 2: HISTORY HARGA (365 HARI)
+# BAGIAN 2 — HISTORY HARGA (365 HARI)
 # ════════════════════════════════════════════════════════════
 
 def muat_history():
@@ -178,9 +161,9 @@ def muat_history():
         try:
             with open(FILE_HISTORY, encoding="utf-8") as f:
                 data = json.load(f)
-            # Konversi format lama ke format baru
             if "records" not in data and "harga_1_gram" in data:
-                return {"records": [{"tanggal": data["tanggal"], "harga": data["harga_1_gram"]}]}
+                return {"records": [{"tanggal": data["tanggal"],
+                                     "harga":   data["harga_1_gram"]}]}
             return data
         except Exception:
             pass
@@ -208,8 +191,8 @@ def cari_harga_n_hari_lalu(records, n_hari):
 
 
 def analisa_historis(harga_sekarang, records):
-    periode = {"kemarin":1, "7_hari":7, "1_bulan":30,
-               "3_bulan":90, "6_bulan":180, "1_tahun":365}
+    periode = {"kemarin":1,"7_hari":7,"1_bulan":30,
+               "3_bulan":90,"6_bulan":180,"1_tahun":365}
     hasil = {}
     for label, n in periode.items():
         rec = cari_harga_n_hari_lalu(records, n)
@@ -228,7 +211,7 @@ def analisa_historis(harga_sekarang, records):
 
 
 # ════════════════════════════════════════════════════════════
-# BAGIAN 3: JUDUL CLICKBAIT LOKAL
+# BAGIAN 3 — JUDUL CLICKBAIT LOKAL (tidak dari Gemini)
 # ════════════════════════════════════════════════════════════
 
 def buat_judul_clickbait_lokal(info, historis):
@@ -237,14 +220,13 @@ def buat_judul_clickbait_lokal(info, historis):
     selisih = f"Rp {info['selisih']:,}".replace(",", ".")
 
     nama_periode = {
-        "kemarin":"Kemarin", "7_hari":"Seminggu",
-        "1_bulan":"Sebulan", "3_bulan":"3 Bulan",
-        "6_bulan":"6 Bulan", "1_tahun":"Setahun",
+        "kemarin":"Kemarin","7_hari":"Seminggu",
+        "1_bulan":"Sebulan","3_bulan":"3 Bulan",
+        "6_bulan":"6 Bulan","1_tahun":"Setahun",
     }
 
-    # Cari perubahan signifikan historis (≥ 2%)
     penting = None
-    for label in ["3_bulan", "1_bulan", "6_bulan", "1_tahun", "7_hari"]:
+    for label in ["3_bulan","1_bulan","6_bulan","1_tahun","7_hari"]:
         data = historis.get(label)
         if data and abs(data["persen"]) >= 2.0:
             penting = (label, data)
@@ -255,18 +237,20 @@ def buat_judul_clickbait_lokal(info, historis):
         pct           = abs(data["persen"])
         arah          = "NAIK" if data["naik"] else "TURUN"
         periode_label = nama_periode.get(label, label)
-        pool = [
-            f"NAIK {pct:.1f}% dari {periode_label} Lalu! Emas Antam {h}/gram Hari Ini",
-            f"WASPADA! Emas Sudah {arah} {pct:.1f}% dalam {periode_label} - {h}",
-            f"Harga Emas {arah} {pct:.1f}% Sejak {periode_label} Lalu! Masih Beli?",
-            f"{arah} {pct:.1f}% dalam {periode_label}! Emas Antam Kini {h}/gram",
-        ] if data["naik"] else [
-            f"TURUN {pct:.1f}% dari {periode_label} Lalu! Saatnya Borong Emas {h}?",
-            f"EMAS ANJLOK {pct:.1f}% dalam {periode_label}! Peluang Beli di {h}",
-            f"Harga Emas TURUN {pct:.1f}% Sejak {periode_label} - Tunggu Apa Lagi?",
-            f"DISKON {pct:.1f}%! Emas Antam Kini {h}/gram - Beli atau Tunggu?",
-        ]
-
+        if data["naik"]:
+            pool = [
+                f"NAIK {pct:.1f}% dari {periode_label} Lalu! Emas Antam {h}/gram Hari Ini",
+                f"WASPADA! Emas Sudah NAIK {pct:.1f}% dalam {periode_label} - Harga {h}",
+                f"Harga Emas MELONJAK {pct:.1f}% Sejak {periode_label} Lalu! Masih Beli?",
+                f"NAIK {pct:.1f}% dalam {periode_label}! Emas Antam Kini {h}/gram",
+            ]
+        else:
+            pool = [
+                f"TURUN {pct:.1f}% dari {periode_label} Lalu! Saatnya Borong Emas {h}?",
+                f"EMAS ANJLOK {pct:.1f}% dalam {periode_label}! Peluang Beli di {h}",
+                f"Harga Emas TURUN {pct:.1f}% Sejak {periode_label} - Tunggu Apa Lagi?",
+                f"DISKON {pct:.1f}%! Emas Antam Kini {h}/gram - Beli atau Tunggu?",
+            ]
     elif status == "Naik":
         pool = [
             f"🚨 EMAS NAIK {selisih} HARI INI! Antam {h}/gram - Masih Mau Beli?",
@@ -284,17 +268,34 @@ def buat_judul_clickbait_lokal(info, historis):
     else:
         pool = [
             f"Harga Emas Antam STAGNAN di {h}/gram - Kapan Akan Bergerak?",
-            f"SINYAL APA INI? Emas Antam Bertahan di {h}/gram - Analisa Lengkap",
+            f"SINYAL APA INI? Emas Antam Bertahan di {h}/gram - Analisa Hari Ini",
             f"Emas Antam Hari Ini {h}/gram - Naik atau Turun Selanjutnya?",
             f"KONSOLIDASI? Emas Antam {h}/gram - Ini Kata Para Analis",
         ]
 
-    judul = random.choice(pool)
-    return judul[:100]
+    return random.choice(pool)[:100]
+
+
+def _validasi_judul(judul_raw, info, historis):
+    KATA_BOCOR = [
+        "tentu", "berikut", "ini dia", "mari kita", "dengan senang",
+        "baik,", "oke,", "siap,", "kamu adalah", "scriptwriter",
+        "channel anda", "harga emas hari ini:", "harga emas batangan",
+        "sobat emas!", "konten youtube"
+    ]
+    judul_cek = judul_raw.lower().strip()
+    bocor     = any(k in judul_cek for k in KATA_BOCOR)
+
+    if bocor or len(judul_raw.strip()) < 10:
+        judul_fix = buat_judul_clickbait_lokal(info, historis)
+        print(f"  -> [FIX] Judul bocor terdeteksi → diganti: {judul_fix}")
+        return judul_fix
+
+    return judul_raw.strip()[:100]
 
 
 # ════════════════════════════════════════════════════════════
-# BAGIAN 4: SCRAPING HARGA EMAS
+# BAGIAN 4 — SCRAPING HARGA EMAS
 # ════════════════════════════════════════════════════════════
 
 def scrape_dan_kalkulasi_harga():
@@ -341,13 +342,12 @@ def scrape_dan_kalkulasi_harga():
             if data:
                 arah = "↑" if data["naik"] else ("↓" if not data["stabil"] else "→")
                 ringkasan.append(
-                    f"{label}: {arah}{abs(data['persen']):.1f}% "
-                    f"({data['harga_ref']:,}→{harga_1_gram:,})".replace(",", ".")
+                    f"{label}:{arah}{abs(data['persen']):.1f}%"
                 )
 
-        print(f"  -> Rp {harga_1_gram:,} | {status} Rp {selisih:,} | {len(records_baru)} hari history".replace(",", "."))
-        if ringkasan:
-            print(f"  -> Historis: {' | '.join(ringkasan[:4])}")
+        print(f"  -> Rp {harga_1_gram:,} | {status} Rp {selisih:,} | "
+              f"{len(records_baru)} hari tersimpan".replace(",", "."))
+        print(f"  -> Historis: {' | '.join(ringkasan[:5])}")
 
         info = {
             "harga_sekarang": harga_1_gram,
@@ -356,7 +356,11 @@ def scrape_dan_kalkulasi_harga():
             "historis":       historis,
             "total_record":   len(records_baru),
         }
-        konteks = "; ".join(ringkasan)
+        konteks = "; ".join([
+            f"{lb}: {'naik' if d['naik'] else ('turun' if not d['stabil'] else 'stabil')} "
+            f"{abs(d['persen']):.1f}% dari Rp {d['harga_ref']:,}".replace(",",".")
+            for lb, d in historis.items() if d
+        ])
         teks_data = (f"Tanggal: {tanggal}. Historis: {konteks}. "
                      f"Data Antam: {data_kasar[:2500]}...")
         return info, teks_data
@@ -367,7 +371,7 @@ def scrape_dan_kalkulasi_harga():
 
 
 # ════════════════════════════════════════════════════════════
-# BAGIAN 5: NARASI & JUDUL (GEMINI + FALLBACK)
+# BAGIAN 5 — NARASI & JUDUL (GEMINI + FALLBACK LOKAL)
 # ════════════════════════════════════════════════════════════
 
 def _buat_narasi_fallback_lokal(info, harga_skrg, status_harga, selisih_harga):
@@ -376,24 +380,23 @@ def _buat_narasi_fallback_lokal(info, harga_skrg, status_harga, selisih_harga):
                "Thursday":"Kamis","Friday":"Jumat",
                "Saturday":"Sabtu","Sunday":"Minggu"
                }.get(datetime.now().strftime("%A"), "")
-
-    h     = info['harga_sekarang']
-    tabel = {
-        "setengah gram":             h // 2,
+    h       = info['harga_sekarang']
+    tabel   = {
+        "setengah gram":             h//2,
         "satu gram":                 h,
-        "dua gram":                  h * 2,
-        "tiga gram":                 h * 3,
-        "lima gram":                 h * 5,
-        "sepuluh gram":              h * 10,
-        "dua puluh lima gram":       h * 25,
-        "lima puluh gram":           h * 50,
-        "seratus gram":              h * 100,
-        "dua ratus lima puluh gram": h * 250,
-        "lima ratus gram":           h * 500,
-        "seribu gram":               h * 1000,
+        "dua gram":                  h*2,
+        "tiga gram":                 h*3,
+        "lima gram":                 h*5,
+        "sepuluh gram":              h*10,
+        "dua puluh lima gram":       h*25,
+        "lima puluh gram":           h*50,
+        "seratus gram":              h*100,
+        "dua ratus lima puluh gram": h*250,
+        "lima ratus gram":           h*500,
+        "seribu gram":               h*1000,
     }
-    rp      = lambda x: f"Rp {x:,}".replace(",", ".")
-    daftar  = " ".join(f"Untuk {s}, harganya {rp(v)}." for s, v in tabel.items())
+    rp     = lambda x: f"Rp {x:,}".replace(",",".")
+    daftar = " ".join(f"Untuk {s}, harganya {rp(v)}." for s,v in tabel.items())
 
     kalimat_status = {
         "Naik":   f"mengalami kenaikan sebesar Rupiah {selisih_harga} dari kemarin",
@@ -401,14 +404,15 @@ def _buat_narasi_fallback_lokal(info, harga_skrg, status_harga, selisih_harga):
         "Stabil": "terpantau stabil dari hari sebelumnya",
     }.get(status_harga, "terpantau stabil")
 
-    historis = info.get("historis", {})
+    historis         = info.get("historis", {})
     kalimat_historis = ""
     for label, data in historis.items():
         if data and abs(data["persen"]) >= 1.0:
-            arah  = "naik" if data["naik"] else "turun"
-            nama  = {"kemarin":"kemarin","7_hari":"seminggu lalu",
-                     "1_bulan":"sebulan lalu","3_bulan":"tiga bulan lalu",
-                     "6_bulan":"enam bulan lalu","1_tahun":"setahun lalu"}.get(label, label)
+            arah = "naik" if data["naik"] else "turun"
+            nama = {"kemarin":"kemarin","7_hari":"seminggu lalu",
+                    "1_bulan":"sebulan lalu","3_bulan":"tiga bulan lalu",
+                    "6_bulan":"enam bulan lalu","1_tahun":"setahun lalu"
+                    }.get(label, label)
             kalimat_historis = (
                 f" Jika dibandingkan dengan {nama}, harga emas telah {arah} "
                 f"sebesar {abs(data['persen']):.1f} persen dari "
@@ -416,31 +420,30 @@ def _buat_narasi_fallback_lokal(info, harga_skrg, status_harga, selisih_harga):
             )
             break
 
-    judul  = buat_judul_clickbait_lokal(info, historis)
     narasi = f"""Halo sobat {NAMA_CHANNEL}, selamat datang kembali di channel kita tercinta. Hari ini hari {hari}, tanggal {tanggal}, dan seperti biasa kami hadir membawakan update terbaru harga emas Antam Logam Mulia untuk Anda semua.
 
 Langsung kita masuk ke informasi utama. Harga emas Antam resmi hari ini untuk ukuran satu gram adalah {harga_skrg} Rupiah. Harga ini {kalimat_status}.{kalimat_historis} Informasi ini kami ambil langsung dari situs resmi Logam Mulia sehingga dapat dijadikan acuan yang akurat dan terpercaya.
 
 Berikut daftar lengkap harga emas Antam hari ini untuk semua ukuran yang tersedia. {daftar} Itulah harga lengkap emas Antam hari ini. Pastikan selalu cek harga terbaru sebelum memutuskan membeli karena harga emas bergerak dinamis setiap harinya mengikuti pasar global.
 
-Sekarang mari kita bahas faktor-faktor yang mempengaruhi pergerakan harga emas saat ini. Pertama, kebijakan suku bunga bank sentral Amerika Serikat Federal Reserve menjadi penentu utama arah harga emas global. Ketika suku bunga tinggi, dolar menguat dan emas cenderung tertekan karena investor beralih ke aset berbunga. Sebaliknya, penurunan suku bunga selalu menjadi katalis positif bagi harga emas. Kedua, ketidakpastian geopolitik global terus mendorong permintaan emas sebagai safe haven. Konflik di berbagai belahan dunia membuat investor mencari perlindungan nilai aset di emas yang sudah teruji selama ribuan tahun. Ketiga, nilai tukar Rupiah terhadap Dolar Amerika secara langsung menentukan harga emas dalam negeri. Pelemahan Rupiah otomatis akan mendorong harga emas dalam Rupiah menjadi lebih tinggi. Keempat, permintaan fisik dari India dan Tiongkok sebagai konsumen emas terbesar dunia turut mempengaruhi harga secara signifikan, terutama menjelang musim perayaan dan hari besar keagamaan.
+Sekarang mari kita bahas faktor-faktor yang mempengaruhi pergerakan harga emas saat ini. Pertama, kebijakan suku bunga bank sentral Amerika Serikat Federal Reserve menjadi penentu utama arah harga emas global. Ketika suku bunga tinggi, dolar menguat dan emas cenderung tertekan karena investor beralih ke aset berbunga. Sebaliknya, penurunan suku bunga selalu menjadi katalis positif bagi harga emas. Kedua, ketidakpastian geopolitik global terus mendorong permintaan emas sebagai safe haven. Konflik di berbagai belahan dunia membuat investor mencari perlindungan nilai aset di emas yang sudah teruji selama ribuan tahun. Ketiga, nilai tukar Rupiah terhadap Dolar Amerika secara langsung menentukan harga emas dalam negeri. Pelemahan Rupiah otomatis mendorong harga emas dalam Rupiah menjadi lebih tinggi. Keempat, permintaan fisik dari India dan Tiongkok sebagai konsumen emas terbesar dunia turut mempengaruhi harga secara signifikan terutama menjelang musim perayaan dan hari besar keagamaan.
 
-Bagi sobat yang ingin memulai atau menambah portofolio investasi emas, ada beberapa strategi yang telah terbukti efektif. Pertama, mulailah dari ukuran kecil seperti setengah gram atau satu gram agar tidak memberatkan keuangan Anda. Kedua, terapkan strategi dollar cost averaging yaitu membeli rutin setiap bulan dengan jumlah tetap tanpa peduli kondisi harga. Strategi ini terbukti menghasilkan harga rata-rata yang lebih baik dalam jangka panjang. Ketiga, manfaatkan momen penurunan harga sebagai kesempatan menambah koleksi karena emas secara historis selalu pulih dan mencetak rekor baru. Keempat, simpan emas fisik Anda di tempat yang aman, baik di brankas khusus maupun menggunakan layanan titipan resmi dari Antam yang sudah terjamin keamanannya. Kelima, pisahkan emas investasi dari emas perhiasan karena emas batangan memiliki biaya produksi yang jauh lebih rendah sehingga lebih efisien sebagai instrumen investasi murni.
+Bagi sobat yang ingin memulai atau menambah portofolio investasi emas, ada beberapa strategi yang telah terbukti efektif. Pertama, mulailah dari ukuran kecil seperti setengah gram atau satu gram agar tidak memberatkan keuangan Anda. Kedua, terapkan strategi dollar cost averaging yaitu membeli rutin setiap bulan dengan jumlah tetap tanpa peduli kondisi harga. Strategi ini terbukti menghasilkan harga rata-rata yang lebih baik dalam jangka panjang. Ketiga, manfaatkan momen penurunan harga sebagai kesempatan menambah koleksi karena emas secara historis selalu pulih dan mencetak rekor baru. Keempat, simpan emas fisik Anda di tempat yang aman baik di brankas khusus maupun menggunakan layanan titipan resmi dari Antam yang sudah terjamin keamanannya. Kelima, pisahkan emas investasi dari emas perhiasan karena emas batangan memiliki biaya produksi yang jauh lebih rendah sehingga lebih efisien sebagai instrumen investasi murni.
 
 Demikian informasi lengkap harga emas Antam hari ini beserta analisa dan tips investasi dari kami di channel {NAMA_CHANNEL}. Semoga informasi ini bermanfaat dan membantu Anda dalam mengambil keputusan investasi yang tepat dan menguntungkan. Jangan lupa tekan tombol Subscribe dan aktifkan lonceng notifikasi agar tidak pernah ketinggalan update harga emas terbaru setiap hari. Bagikan video ini kepada keluarga dan teman yang membutuhkan informasi seputar investasi emas. Sampai jumpa di video berikutnya. Salam sukses dan salam investasi untuk sobat semua!""".strip()
 
-    return judul, narasi
+    return narasi
 
 
 def buat_narasi_dan_judul(info, data_harga):
     print("[2/6] Membuat judul + meminta Gemini menulis script...")
 
     status_harga  = info['status']
-    selisih_harga = f"{info['selisih']:,}".replace(",", ".")
-    harga_skrg    = f"{info['harga_sekarang']:,}".replace(",", ".")
+    selisih_harga = f"{info['selisih']:,}".replace(",",".")
+    harga_skrg    = f"{info['harga_sekarang']:,}".replace(",",".")
     historis      = info.get("historis", {})
 
-    # Judul dibuat lokal — 100% reliable & selalu clickbait
+    # Judul SELALU dari lokal — tidak pernah dari Gemini
     judul = buat_judul_clickbait_lokal(info, historis)
     print(f"  -> Judul: {judul}")
 
@@ -453,11 +456,13 @@ def buat_narasi_dan_judul(info, data_harga):
                     }.get(label, label)
             ringkasan_historis.append(
                 f"{nama}: {arah} {abs(data['persen']):.1f}% dari "
-                f"Rp {data['harga_ref']:,}".replace(",", ".")
+                f"Rp {data['harga_ref']:,}".replace(",",".")
             )
     konteks_historis = " | ".join(ringkasan_historis) or "Data historis belum tersedia."
 
-    prompt = f"""Kamu adalah scriptwriter YouTube profesional. Tulis HANYA script narasi video. Langsung mulai dengan "Halo sobat..." tanpa kata pengantar apapun.
+    prompt = f"""Kamu adalah scriptwriter YouTube profesional. Tulis HANYA script narasi video.
+
+BARIS PERTAMA HARUS PERSIS: "Halo sobat {NAMA_CHANNEL}," — tidak boleh ada teks apapun sebelumnya.
 
 DATA:
 - Channel: {NAMA_CHANNEL}
@@ -467,16 +472,16 @@ DATA:
 - Data tabel Antam: {data_harga[:2000]}
 
 STRUKTUR SCRIPT (TARGET 900-1000 KATA):
-1. Pembuka (100 kata): Sapa penonton {NAMA_CHANNEL}, umumkan harga Rp {harga_skrg}, status {status_harga}
+1. Pembuka (100 kata): Sapa penonton, umumkan harga Rp {harga_skrg}, status {status_harga}
 2. Daftar harga (200 kata): Semua ukuran 0.5g sampai 1000g
 3. Analisa historis & global (300 kata): Bahas data {konteks_historis}, kaitkan kondisi ekonomi dunia
 4. Edukasi & penutup (300 kata): Tips investasi emas, ajakan subscribe {NAMA_CHANNEL}
 
 ATURAN KERAS:
-- MULAI LANGSUNG "Halo sobat..." — DILARANG tulis "Tentu", "Berikut", "Ini dia" atau kata pengantar apapun
+- MULAI LANGSUNG "Halo sobat {NAMA_CHANNEL}," — DILARANG tulis "Tentu", "Berikut", "Ini dia", atau kata pengantar apapun
 - Semua angka ditulis dengan HURUF
 - Paragraf narasi murni, TANPA bullet, TANPA nomor, TANPA simbol
-- Bahasa Indonesia natural seperti presenter berita"""
+- Bahasa Indonesia natural seperti presenter berita profesional"""
 
     MODEL_CHAIN = [
         "gemini-2.0-flash-lite",
@@ -506,19 +511,33 @@ ATURAN KERAS:
                     continue
 
                 resp.raise_for_status()
-                script = resp.json()['candidates'][0]['content']['parts'][0]['text'].strip()
+                script_raw = resp.json()['candidates'][0]['content']['parts'][0]['text'].strip()
 
                 # Bersihkan kata pengantar jika Gemini masih menambahkan
-                kata_buang = ["tentu,", "tentu ", "berikut,", "berikut ",
-                              "ini dia", "baik,", "oke,", "siap,", "dengan senang"]
-                baris1     = script.split('\n')[0].lower()
-                for kata in kata_buang:
-                    if kata in baris1:
-                        script = '\n'.join(script.split('\n')[1:]).strip()
-                        break
+                baris       = script_raw.split('\n')
+                baris_baru  = []
+                skip_awal   = True
+                for idx_b, baris_item in enumerate(baris):
+                    b_lower = baris_item.lower().strip()
+                    if skip_awal:
+                        if b_lower.startswith("halo sobat"):
+                            skip_awal = False
+                            baris_baru.append(baris_item)
+                        elif idx_b > 4:
+                            skip_awal = False
+                            baris_baru.append(baris_item)
+                    else:
+                        if not (b_lower.startswith("[judul]") or b_lower.startswith("[script]")):
+                            baris_baru.append(baris_item)
+
+                script = '\n'.join(baris_baru).strip()
+                if not script:
+                    script = script_raw
 
                 jumlah_kata = len(script.split())
                 print(f"  -> ✅ Script OK ({jumlah_kata} kata) dari {model_name}")
+
+                judul = _validasi_judul(judul, info, historis)
                 return judul, script
 
             except Exception as e:
@@ -530,12 +549,13 @@ ATURAN KERAS:
         print(f"  -> {model_name} gagal. Coba berikutnya...")
 
     print("  -> [FALLBACK] Pakai narasi template lokal...")
-    _, narasi_fallback = _buat_narasi_fallback_lokal(info, harga_skrg, status_harga, selisih_harga)
+    narasi_fallback = _buat_narasi_fallback_lokal(info, harga_skrg, status_harga, selisih_harga)
+    judul = _validasi_judul(judul, info, historis)
     return judul, narasi_fallback
 
 
 # ════════════════════════════════════════════════════════════
-# BAGIAN 6: GENERATE SUARA
+# BAGIAN 6 — GENERATE SUARA
 # ════════════════════════════════════════════════════════════
 
 def buat_suara(teks, output_audio):
@@ -559,17 +579,185 @@ def buat_suara(teks, output_audio):
     )
     durasi = float(hasil_dur.stdout.strip())
     if durasi < 30:
-        raise ValueError(f"Audio terlalu pendek ({durasi:.1f}s). Narasi terlalu singkat!")
+        raise ValueError(f"Audio terlalu pendek ({durasi:.1f}s)!")
     print(f"  -> ✅ Audio OK: {durasi:.0f} detik ({durasi/60:.1f} menit)")
     return durasi
 
 
 # ════════════════════════════════════════════════════════════
-# BAGIAN 7: RENDER VIDEO
+# BAGIAN 7 — THUMBNAIL PROFESIONAL
+# ════════════════════════════════════════════════════════════
+
+def _cari_font(ukuran):
+    from PIL import ImageFont
+    font_paths = [
+        "/usr/share/fonts/truetype/open-sans/OpenSans-Bold.ttf",
+        "/usr/share/fonts/opentype/open-sans/OpenSans-Bold.ttf",
+        "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
+        "C:/Windows/Fonts/arialbd.ttf",
+        "C:/Windows/Fonts/calibrib.ttf",
+        "C:/Windows/Fonts/verdanab.ttf",
+        "font_temp.ttf",
+    ]
+    for path in font_paths:
+        if os.path.exists(path):
+            try:
+                return ImageFont.truetype(path, ukuran)
+            except Exception:
+                continue
+    return ImageFont.load_default()
+
+
+def _teks_shadow(draw, posisi, teks, font, warna, shadow=(0,0,0,220), offset=3):
+    x, y = posisi
+    for dx, dy in [(offset,offset),(-offset,offset),(offset,-offset),(-offset,-offset)]:
+        draw.text((x+dx, y+dy), teks, font=font, fill=shadow)
+    draw.text((x, y), teks, font=font, fill=warna)
+
+
+def buat_thumbnail(info, judul, gambar_bank, output_path="thumbnail.jpg"):
+    from PIL import Image, ImageDraw, ImageFont, ImageFilter
+    W, H = 1280, 720
+
+    # Background
+    if gambar_bank:
+        bg_path = random.choice(gambar_bank)
+        try:
+            bg    = Image.open(bg_path).convert("RGB")
+            bw,bh = bg.size
+            skala = max(W/bw, H/bh)
+            bg    = bg.resize((int(bw*skala), int(bh*skala)), Image.LANCZOS)
+            bw,bh = bg.size
+            bg    = bg.crop(((bw-W)//2, (bh-H)//2, (bw-W)//2+W, (bh-H)//2+H))
+        except Exception as e:
+            print(f"  -> Fallback bg solid: {e}")
+            bg = Image.new("RGB", (W,H), (15,15,35))
+    else:
+        bg = Image.new("RGB", (W,H), (15,15,35))
+
+    bg     = bg.filter(ImageFilter.GaussianBlur(radius=2))
+    canvas = bg.copy()
+    draw   = ImageDraw.Draw(canvas, "RGBA")
+
+    # Gradient gelap dari bawah
+    for y in range(H):
+        alpha = int(160 * (y/H)**1.2)
+        draw.line([(0,y),(W,y)], fill=(0,0,0,alpha))
+    # Solid gelap area bawah
+    draw.rectangle([(0,H-190),(W,H)], fill=(0,0,0,210))
+    # Solid gelap area kiri (untuk badge)
+    draw.rectangle([(0,0),(420,150)], fill=(0,0,0,120))
+
+    # Skema warna per status
+    status = info['status']
+    WARNA  = {
+        "Naik":   {"badge":(200,20,20),  "aksen":(255,70,70),  "icon":"▲ NAIK"},
+        "Turun":  {"badge":(0,160,70),   "aksen":(40,210,110), "icon":"▼ TURUN"},
+        "Stabil": {"badge":(180,140,0),  "aksen":(255,200,0),  "icon":"● STABIL"},
+    }
+    skema = WARNA.get(status, WARNA["Stabil"])
+
+    # Badge status (kiri atas)
+    bx1,by1,bx2,by2 = 30,30,400,125
+    draw.rounded_rectangle([(bx1,by1),(bx2,by2)], radius=14, fill=(*skema["badge"],230))
+    draw.rectangle([(bx1,by1),(bx1+10,by2)], fill=(*skema["aksen"],255))
+    font_badge = _cari_font(54)
+    bbox_b     = draw.textbbox((0,0), skema["icon"], font=font_badge)
+    tx_b = bx1+20+((bx2-bx1-20-(bbox_b[2]-bbox_b[0]))//2)
+    ty_b = by1+((by2-by1-(bbox_b[3]-bbox_b[1]))//2)
+    draw.text((tx_b, ty_b), skema["icon"], font=font_badge, fill=(255,255,255,255))
+
+    # Harga besar (tengah)
+    harga_str  = f"Rp {info['harga_sekarang']:,}".replace(",",".")
+    font_harga = _cari_font(118)
+    bbox_h     = draw.textbbox((0,0), harga_str, font=font_harga)
+    # Auto-kecilkan jika terlalu lebar
+    while (bbox_h[2]-bbox_h[0]) > W-80 and font_harga.size > 60:
+        font_harga = _cari_font(font_harga.size-6)
+        bbox_h     = draw.textbbox((0,0), harga_str, font=font_harga)
+
+    tx_h = (W-(bbox_h[2]-bbox_h[0]))//2
+    ty_h = 150
+    _teks_shadow(draw, (tx_h,ty_h), harga_str, font_harga,
+                 warna=(255,215,0,255), shadow=(0,0,0,230), offset=5)
+
+    # Subtitle "/gram hari ini"
+    font_sub = _cari_font(44)
+    teks_sub = "/gram hari ini"
+    bbox_sub = draw.textbbox((0,0), teks_sub, font=font_sub)
+    tx_sub   = (W-(bbox_sub[2]-bbox_sub[0]))//2
+    ty_sub   = ty_h + (bbox_h[3]-bbox_h[1]) + 8
+    _teks_shadow(draw, (tx_sub,ty_sub), teks_sub, font_sub,
+                 warna=(210,210,210,255), shadow=(0,0,0,200), offset=2)
+
+    # Teks highlight historis
+    historis = info.get("historis", {})
+    teks_hl  = ""
+    for label, data in historis.items():
+        if data and abs(data["persen"]) >= 1.5:
+            arah = "NAIK" if data["naik"] else "TURUN"
+            nama = {"kemarin":"KEMARIN","7_hari":"SEMINGGU","1_bulan":"SEBULAN",
+                    "3_bulan":"3 BULAN","6_bulan":"6 BULAN","1_tahun":"SETAHUN"
+                    }.get(label, label.upper())
+            teks_hl = f"{arah} {abs(data['persen']):.1f}% DARI {nama} LALU!"
+            break
+    if not teks_hl:
+        if status == "Naik":
+            teks_hl = f"NAIK Rp {info['selisih']:,} DARI KEMARIN!".replace(",",".")
+        elif status == "Turun":
+            teks_hl = f"TURUN Rp {info['selisih']:,} — SAATNYA BELI?".replace(",",".")
+        else:
+            teks_hl = "UPDATE RESMI ANTAM — HARGA TERKINI!"
+
+    font_hl  = _cari_font(60)
+    bbox_hl  = draw.textbbox((0,0), teks_hl, font=font_hl)
+    while (bbox_hl[2]-bbox_hl[0]) > W-80 and font_hl.size > 28:
+        font_hl = _cari_font(font_hl.size-4)
+        bbox_hl = draw.textbbox((0,0), teks_hl, font=font_hl)
+
+    tx_hl = (W-(bbox_hl[2]-bbox_hl[0]))//2
+    ty_hl = H-178
+    pad   = 14
+    draw.rounded_rectangle(
+        [(tx_hl-pad, ty_hl-pad),
+         (tx_hl+(bbox_hl[2]-bbox_hl[0])+pad, ty_hl+(bbox_hl[3]-bbox_hl[1])+pad)],
+        radius=10, fill=(*skema["badge"],210)
+    )
+    _teks_shadow(draw, (tx_hl,ty_hl), teks_hl, font_hl,
+                 warna=(255,255,255,255), shadow=(0,0,0,200), offset=2)
+
+    # Nama channel (kanan bawah)
+    font_ch = _cari_font(36)
+    teks_ch = f"▶ {NAMA_CHANNEL}"
+    bbox_ch = draw.textbbox((0,0), teks_ch, font=font_ch)
+    tx_ch   = W-(bbox_ch[2]-bbox_ch[0])-30
+    ty_ch   = H-(bbox_ch[3]-bbox_ch[1])-22
+    _teks_shadow(draw, (tx_ch,ty_ch), teks_ch, font_ch,
+                 warna=(255,255,255,200), shadow=(0,0,0,180), offset=2)
+    draw.rectangle(
+        [(tx_ch, ty_ch+(bbox_ch[3]-bbox_ch[1])+6),
+         (W-30,  ty_ch+(bbox_ch[3]-bbox_ch[1])+10)],
+        fill=(*skema["aksen"],200)
+    )
+
+    # Simpan
+    final = Image.new("RGB", (W,H), (0,0,0))
+    final.paste(canvas.convert("RGB"), (0,0))
+    final.save(output_path, "JPEG", quality=92, optimize=True)
+    ukuran_kb = os.path.getsize(output_path)//1024
+    print(f"  -> ✅ Thumbnail: {output_path} ({ukuran_kb} KB, {W}x{H}px)")
+    return output_path
+
+
+# ════════════════════════════════════════════════════════════
+# BAGIAN 8 — RENDER VIDEO
 # ════════════════════════════════════════════════════════════
 
 def escape_ffmpeg_path(path):
-    return path.replace('\\', '/').replace(':', '\\:')
+    return path.replace('\\','/').replace(':','\\:')
 
 
 def siapkan_font_lokal():
@@ -604,7 +792,6 @@ def render_satu_klip(args):
         f"{base},hue=s='min(1,t/1.5)',fade=t=in:st=0:d=1,fade=t=out:st=9:d=1",
     ]
     filter_vf = random.choice(pilihan_filter)
-
     if font_sistem:
         font_esc = escape_ffmpeg_path(font_sistem)
         x, y    = random.choice([("30","30"),("w-tw-30","30"),
@@ -612,7 +799,6 @@ def render_satu_klip(args):
         filter_vf += (f",drawtext=fontfile='{font_esc}'"
                       f":text='{NAMA_CHANNEL}'"
                       f":fontcolor=white@0.7:fontsize=30:x={x}:y={y}")
-
     cmd = [
         'ffmpeg', '-y',
         '-loop', '1', '-framerate', '30', '-i', img,
@@ -625,7 +811,6 @@ def render_satu_klip(args):
     with open(FFMPEG_LOG, 'a', encoding='utf-8') as log:
         log.write(f"\n=== Klip {i}: {os.path.basename(img)} ===\n")
         result = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=log)
-
     if (result.returncode != 0 or not os.path.exists(output_klip)
             or os.path.getsize(output_klip) < 1000):
         return None
@@ -640,11 +825,12 @@ def proses_gambar(durasi_total_detik, gambar_bank):
         print("ERROR: Bank gambar kosong!")
         return None
 
-    random.shuffle(gambar_bank)
+    gambar_list = list(gambar_bank)
+    random.shuffle(gambar_list)
     jumlah_klip = int(durasi_total_detik / 10) + 2
-    while len(gambar_bank) < jumlah_klip:
-        gambar_bank.extend(gambar_bank)
-    gambar_terpilih = gambar_bank[:jumlah_klip]
+    while len(gambar_list) < jumlah_klip:
+        gambar_list.extend(gambar_list)
+    gambar_terpilih = gambar_list[:jumlah_klip]
 
     font_sistem = siapkan_font_lokal()
     tasks = [(i, img, font_sistem, os.path.abspath(f"temp_clips/klip_{i}.mp4"))
@@ -678,8 +864,7 @@ def render_video_final(file_list, audio, output, durasi):
         '-f', 'concat', '-safe', '0', '-i', file_list,
         '-i', audio,
         '-map', '0:v', '-map', '1:a',
-        '-c:v', 'copy',
-        '-c:a', 'aac', '-b:a', '192k',
+        '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k',
         '-t', str(durasi), output
     ]
     with open(FFMPEG_LOG, 'a', encoding='utf-8') as log:
@@ -692,10 +877,10 @@ def render_video_final(file_list, audio, output, durasi):
 
 
 # ════════════════════════════════════════════════════════════
-# BAGIAN 8: UPLOAD YOUTUBE
+# BAGIAN 9 — UPLOAD YOUTUBE
 # ════════════════════════════════════════════════════════════
 
-def upload_ke_youtube(video_path, judul, deskripsi, tags):
+def upload_ke_youtube(video_path, judul, deskripsi, tags, thumbnail_path=None):
     print("[6/6] Upload ke YouTube...")
     try:
         from google.oauth2.credentials import Credentials
@@ -721,13 +906,24 @@ def upload_ke_youtube(video_path, judul, deskripsi, tags):
             client_id=td.get("client_id"), client_secret=td.get("client_secret"),
         )
         youtube = build("youtube", "v3", credentials=creds)
-        body    = {
+
+        # Validasi judul terakhir sebelum upload
+        judul_final = judul.strip()[:100]
+        if len(judul_final) < 10:
+            judul_final = f"Harga Emas Antam Hari Ini - {datetime.now().strftime('%d %B %Y')}"
+
+        body = {
             "snippet": {
-                "title": judul[:100], "description": deskripsi,
-                "tags": tags, "categoryId": YOUTUBE_CATEGORY,
+                "title":           judul_final,
+                "description":     deskripsi,
+                "tags":            tags,
+                "categoryId":      YOUTUBE_CATEGORY,
                 "defaultLanguage": "id",
             },
-            "status": {"privacyStatus": "public", "selfDeclaredMadeForKids": False}
+            "status": {
+                "privacyStatus":           "public",
+                "selfDeclaredMadeForKids": False
+            }
         }
         media   = MediaFileUpload(video_path, mimetype="video/mp4",
                                   resumable=True, chunksize=5*1024*1024)
@@ -737,15 +933,33 @@ def upload_ke_youtube(video_path, judul, deskripsi, tags):
         while response is None:
             status_up, response = request.next_chunk()
             if status_up:
-                print(f"  -> Upload: {int(status_up.progress()*100)}%", end='\r')
+                print(f"  -> Upload video: {int(status_up.progress()*100)}%", end='\r')
 
         video_id = response.get("id")
-        print(f"\n  -> ✅ Upload sukses! https://youtu.be/{video_id}")
+        print(f"\n  -> ✅ Video terupload! https://youtu.be/{video_id}")
+
+        # Upload thumbnail
+        if thumbnail_path and os.path.exists(thumbnail_path):
+            try:
+                print(f"  -> Upload thumbnail...")
+                thumb_media = MediaFileUpload(thumbnail_path, mimetype="image/jpeg")
+                youtube.thumbnails().set(
+                    videoId=video_id, media_body=thumb_media
+                ).execute()
+                print(f"  -> ✅ Thumbnail terupload!")
+            except Exception as e:
+                print(f"  -> ⚠️  Thumbnail gagal: {e}")
+                print(f"     (Pastikan channel sudah verifikasi nomor HP)")
 
         with open("upload_history.json", "a", encoding="utf-8") as f:
-            json.dump({"tanggal": datetime.now().isoformat(),
-                       "video_id": video_id, "judul": judul}, f, ensure_ascii=False)
+            json.dump({
+                "tanggal":  datetime.now().isoformat(),
+                "video_id": video_id,
+                "judul":    judul_final,
+                "url":      f"https://youtu.be/{video_id}"
+            }, f, ensure_ascii=False)
             f.write("\n")
+
         return video_id
 
     except Exception as e:
@@ -754,21 +968,27 @@ def upload_ke_youtube(video_path, judul, deskripsi, tags):
 
 
 # ════════════════════════════════════════════════════════════
-# BAGIAN 9: BERSIHKAN TEMP
+# BAGIAN 10 — BERSIHKAN TEMP
 # ════════════════════════════════════════════════════════════
 
-def bersihkan_temp(file_list, audio):
+def bersihkan_temp(file_list, audio, thumbnail=None):
     print("[+] Membersihkan file sementara...")
-    try:
-        for f in [audio, file_list, "font_temp.ttf"]:
-            if f and os.path.exists(f):
+    for f in [audio, file_list, "font_temp.ttf", thumbnail]:
+        if f and os.path.exists(f):
+            try:
                 os.remove(f)
-        for klip in glob.glob("temp_clips/*.mp4"):
+            except Exception:
+                pass
+    for klip in glob.glob("temp_clips/*.mp4"):
+        try:
             os.remove(klip)
-        if os.path.exists("temp_clips"):
+        except Exception:
+            pass
+    if os.path.exists("temp_clips"):
+        try:
             os.rmdir("temp_clips")
-    except Exception as e:
-        print(f"  -> Warning: {e}")
+        except Exception:
+            pass
 
 
 # ════════════════════════════════════════════════════════════
@@ -779,50 +999,50 @@ async def main():
     with open(FFMPEG_LOG, 'w', encoding='utf-8') as f:
         f.write(f"Log FFmpeg - {datetime.now()}\n{'='*60}\n")
 
-    audio_temp  = "suara.mp3"
-    tanggal_str = datetime.now().strftime('%Y%m%d')
-    video_hasil = f"Video_Emas_{tanggal_str}.mp4"
+    audio_temp     = "suara.mp3"
+    tanggal_str    = datetime.now().strftime('%Y%m%d')
+    video_hasil    = f"Video_Emas_{tanggal_str}.mp4"
+    thumbnail_path = None
 
     print(f"\n{'='*60}")
     print(f"  AUTO VIDEO EMAS - {NAMA_CHANNEL}")
     print(f"  {datetime.now().strftime('%d %B %Y, %H:%M WIB')}")
     print(f"{'='*60}\n")
 
-    # ── 0. Manajemen storage ──────────────────────────────────
+    # 0. Manajemen storage
     kelola_video_lama()
     gambar_bank = kelola_bank_gambar()
-
     if not gambar_bank:
-        print("FATAL: Tidak ada gambar tersedia. Proses dihentikan.")
+        print("FATAL: Tidak ada gambar tersedia.")
         return
 
-    # ── 1. Scrape harga ──────────────────────────────────────
+    # 1. Scrape harga
     info, data_harga = scrape_dan_kalkulasi_harga()
     if not info:
-        print("Scraping gagal. Proses dihentikan.")
+        print("Scraping gagal.")
         return
 
-    # ── 2. Narasi & judul ────────────────────────────────────
+    # 2. Narasi & judul
     judul, narasi = buat_narasi_dan_judul(info, data_harga)
     print(f"\n{'='*60}")
-    print(f"  🌟 JUDUL: {judul}")
+    print(f"  🌟 JUDUL : {judul}")
+    print(f"  📊 HARGA : Rp {info['harga_sekarang']:,} | {info['status']}".replace(",","."))
     print(f"{'='*60}\n")
 
-    # ── 3. Generate suara ────────────────────────────────────
+    # 3. Generate suara
     try:
         durasi = buat_suara(narasi, audio_temp)
     except Exception as e:
         print(f"  -> ERROR audio: {e}")
         return
 
-    # ── 4. Render gambar → klip ──────────────────────────────
+    # 4. Render gambar → klip
     file_list = proses_gambar(durasi, list(gambar_bank))
     if not file_list:
         return
 
-    # ── 5. Render video final ────────────────────────────────
+    # 5. Render video final
     sukses = render_video_final(file_list, audio_temp, video_hasil, durasi)
-    bersihkan_temp(file_list, audio_temp)
 
     if sukses and os.path.exists(video_hasil):
         ukuran_mb = os.path.getsize(video_hasil) // 1024 // 1024
@@ -830,25 +1050,40 @@ async def main():
 
         if ukuran_mb < 5:
             print(f"⚠️  Video terlalu kecil! Cek {FFMPEG_LOG}")
+            bersihkan_temp(file_list, audio_temp)
             return
 
-        # ── 6. Upload ke YouTube ──────────────────────────────
+        # Generate thumbnail
+        print("\n[THUMBNAIL] Membuat thumbnail profesional...")
+        try:
+            thumbnail_path = buat_thumbnail(
+                info        = info,
+                judul       = judul,
+                gambar_bank = gambar_bank,
+                output_path = f"thumbnail_{tanggal_str}.jpg"
+            )
+        except Exception as e:
+            print(f"  -> ⚠️  Thumbnail gagal: {e}")
+            thumbnail_path = None
+
+        # Upload YouTube
         deskripsi = (
             f"Update harga emas Antam hari ini "
             f"{datetime.now().strftime('%d %B %Y')}.\n\n"
             f"✅ Harga 1 gram  : Rp {info['harga_sekarang']:,}\n"
-            f"📊 Status        : {info['status']}\n\n"
-            .replace(",", ".") +
+            f"📊 Status        : {info['status']}\n"
+            .replace(",",".") +
+            f"📈 Data tersimpan: {info['total_record']} hari terakhir\n\n"
             "Informasi diambil dari situs resmi Logam Mulia.\n\n"
             "#HargaEmas #EmasAntam #InvestasiEmas #LogamMulia #EmasHariIni\n\n"
             f"Jangan lupa SUBSCRIBE dan aktifkan 🔔 notifikasi!"
         )
-        upload_ke_youtube(video_hasil, judul, deskripsi, YOUTUBE_TAGS)
-
+        upload_ke_youtube(video_hasil, judul, deskripsi, YOUTUBE_TAGS,
+                          thumbnail_path=thumbnail_path)
     else:
         print(f"\n❌ GAGAL membuat video. Cek {FFMPEG_LOG}")
 
-    # ── Ringkasan storage akhir ───────────────────────────────
+    bersihkan_temp(file_list, audio_temp, thumbnail_path)
     ringkasan_storage()
 
 

@@ -2,6 +2,7 @@ name: 🎬 Auto Upload Video Emas Harian
 
 on:
   schedule:
+    # Jalan setiap hari jam 09:00 WIB (02:00 UTC)
     - cron: '0 2 * * *'
   workflow_dispatch:
 
@@ -26,12 +27,19 @@ jobs:
       - name: 🎬 Install FFmpeg
         run: sudo apt-get install -y ffmpeg
 
-       - name: 📦 Install dependencies Python
-        run: pip install requests beautifulsoup4 edge-tts google-api-python-client google-auth-oauthlib Pillow
+      - name: 📦 Install dependencies Python
+        run: |
+          pip install requests
+          pip install beautifulsoup4
+          pip install edge-tts
+          pip install google-api-python-client
+          pip install google-auth-oauthlib
+          pip install Pillow
 
       - name: 🎨 Install font untuk thumbnail
-        run: sudo apt-get install -y fonts-open-sans fonts-liberation || true
-
+        run: |
+          sudo apt-get install -y fonts-open-sans fonts-liberation || true
+          fc-cache -fv || true
 
       - name: 🔑 Setup semua credentials
         env:
@@ -43,8 +51,10 @@ jobs:
           echo "GEMINI_API_KEY=$GEMINI_API_KEY" >> $GITHUB_ENV
           echo "PEXELS_API_KEY=$PEXELS_API_KEY" >> $GITHUB_ENV
 
-      # DEBUG: Cek apakah secret sudah masuk (tidak tampilkan nilai, hanya cek ada/tidak)
       - name: 🔍 Verifikasi secrets
+        env:
+          GEMINI_API_KEY: ${{ env.GEMINI_API_KEY }}
+          PEXELS_API_KEY: ${{ env.PEXELS_API_KEY }}
         run: |
           if [ -z "$GEMINI_API_KEY" ]; then
             echo "❌ GEMINI_API_KEY KOSONG!"
@@ -57,9 +67,6 @@ jobs:
             echo "✅ PEXELS_API_KEY OK (panjang: ${#PEXELS_API_KEY} karakter)"
           fi
           ls -la *.jpg *.png 2>/dev/null || echo "⚠️  Tidak ada gambar lokal di repo"
-        env:
-          GEMINI_API_KEY: ${{ env.GEMINI_API_KEY }}
-          PEXELS_API_KEY: ${{ env.PEXELS_API_KEY }}
 
       - name: 🚀 Jalankan script pembuat video
         run: python video_maker.py
@@ -75,5 +82,3 @@ jobs:
           name: video-emas-${{ github.run_number }}
           path: "Video_Emas_*.mp4"
           retention-days: 3
-
-

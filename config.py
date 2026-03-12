@@ -1,7 +1,10 @@
-# config.py — Semua konfigurasi channel
+# config.py — baris paling atas
 import os
 
-CHANNEL_ID = int(os.environ.get("CHANNEL_ID", "1"))
+# Fix: handle string kosong, None, atau belum diset
+_ch_raw    = os.environ.get("CHANNEL_ID", "").strip()
+CHANNEL_ID = int(_ch_raw) if _ch_raw.isdigit() else 1
+
 
 CHANNEL_CONFIG = {
     1: {

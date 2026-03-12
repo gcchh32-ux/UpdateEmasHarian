@@ -6,7 +6,7 @@ from config import (VIDEO_WIDTH, VIDEO_HEIGHT, FPS,
                     FOLDER_GAMBAR, FOLDER_VIDEO_BANK)
 from utils  import (log, font_path, escape_ffmpeg_path,
                     ffmpeg_duration, ffmpeg_is_valid, log_ffmpeg_tail)
-from storage import list_gambar, list_video_bank
+from store import list_gambar, list_video_bank
 
 # ════════════════════════════════════════════════════════════
 # BAGIAN 1 — GENERATE SUARA (edge-tts)

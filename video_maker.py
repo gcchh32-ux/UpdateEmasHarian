@@ -1329,14 +1329,16 @@ def render_video_final(file_list, audio, output, durasi):
     return True
 
 
+
+
 # ════════════════════════════════════════════════════════════
-# BAGIAN 13 — BUAT THUMBNAIL WARNA-WARNI
+# BAGIAN 13 — BUAT THUMBNAIL PROFESIONAL v2.0
 # ════════════════════════════════════════════════════════════
 
 def buat_thumbnail(info, judul, output_path="thumbnail.jpg"):
-    log("[+] Membuat thumbnail...")
+    log("[+] Membuat thumbnail profesional...")
     try:
-        from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
+        from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance, ImageOps
     except ImportError:
         log("  -> Pillow tidak tersedia, skip thumbnail.")
         return None
@@ -1345,133 +1347,303 @@ def buat_thumbnail(info, judul, output_path="thumbnail.jpg"):
     sk     = SKEMA_AKTIF.get(status, SKEMA_AKTIF.get("Stabil"))
     W, H   = 1280, 720
 
-    # ── Background gradient ──
-    img = Image.new('RGB', (W, H), sk["bg_grad_bawah"])
-    draw= ImageDraw.Draw(img)
-    for y in range(H):
-        r = int(sk["bg_grad_atas"][0] + (sk["bg_grad_bawah"][0]-sk["bg_grad_atas"][0]) * y/H)
-        g = int(sk["bg_grad_atas"][1] + (sk["bg_grad_bawah"][1]-sk["bg_grad_atas"][1]) * y/H)
-        b = int(sk["bg_grad_atas"][2] + (sk["bg_grad_bawah"][2]-sk["bg_grad_atas"][2]) * y/H)
-        draw.line([(0,y),(W,y)], fill=(r,g,b))
-
-    # Jika ada gambar di bank, pakai sebagai background blur
+    # ════════ LAYER 1: Background foto blur ════════
     gambar_bg = _list_gambar()
     if gambar_bg:
         try:
             bg = Image.open(random.choice(gambar_bg)).convert('RGB')
+            # Crop center agar tidak distorsi
+            bg_ratio = bg.width / bg.height
+            th_ratio = W / H
+            if bg_ratio > th_ratio:
+                new_w = int(bg.height * th_ratio)
+                left  = (bg.width - new_w) // 2
+                bg    = bg.crop((left, 0, left + new_w, bg.height))
+            else:
+                new_h = int(bg.width / th_ratio)
+                top   = (bg.height - new_h) // 2
+                bg    = bg.crop((0, top, bg.width, top + new_h))
             bg = bg.resize((W, H), Image.LANCZOS)
-            bg = bg.filter(ImageFilter.GaussianBlur(radius=18))
-            bg = ImageEnhance.Brightness(bg).enhance(0.35)
-            img = Image.blend(img, bg, alpha=0.55)
-            draw = ImageDraw.Draw(img)
-        except: pass
+            bg = bg.filter(ImageFilter.GaussianBlur(radius=8))
+            bg = ImageEnhance.Brightness(bg).enhance(0.25)
+            img = bg.copy()
+        except Exception as e:
+            log(f"  -> Background foto gagal ({e}), pakai gradient")
+            img = _buat_gradient(W, H, sk)
+    else:
+        img = _buat_gradient(W, H, sk)
 
-    # ── Overlay panel kiri ──
-    panel = Image.new('RGBA', (W, H), (0,0,0,0))
-    pd    = ImageDraw.Draw(panel)
-    pd.rectangle([0, 0, W//2+60, H], fill=(0,0,0,160))
-    img   = Image.alpha_composite(img.convert('RGBA'), panel).convert('RGB')
-    draw  = ImageDraw.Draw(img)
+    draw = ImageDraw.Draw(img)
 
-    # ── Garis aksen kiri ──
-    draw.rectangle([0, 0, 12, H], fill=sk["aksen"])
+    # ════════ LAYER 2: Overlay gelap gradient kiri→kanan ════════
+    overlay = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+    od      = ImageDraw.Draw(overlay)
+    # Sisi kiri lebih gelap, kanan transparan
+    for x in range(W):
+        alpha = int(220 * (1 - x / W * 0.6))
+        od.line([(x, 0), (x, H)], fill=(0, 0, 0, alpha))
+    img = Image.alpha_composite(img.convert('RGBA'), overlay).convert('RGB')
+    draw = ImageDraw.Draw(img)
 
-    # ── Badge status ──
-    icon_text = sk["icon"]
-    bx1,by1,bx2,by2 = 30, 30, 260, 100
-    draw.rounded_rectangle([bx1,by1,bx2,by2], radius=16, fill=sk["badge"])
-    draw.rounded_rectangle([bx1,by1,bx2,by2], radius=16, outline=sk["aksen"], width=3)
+    # ════════ LAYER 3: Accent bar kiri ════════
+    # Bar tebal dengan gradient warna
+    for x in range(18):
+        alpha = int(255 * (1 - x / 18 * 0.3))
+        r,g,b = sk["aksen"]
+        draw.line([(x, 0), (x, H)], fill=(r, g, b))
 
-    # Font besar
+    # ════════ FONT SETUP ════════
     font_path = os.path.abspath("font_temp.ttf") if os.path.exists("font_temp.ttf") else None
 
     def get_font(size):
         if font_path:
             try: return ImageFont.truetype(font_path, size)
             except: pass
+        try:
+            # Coba font sistem Ubuntu/Dejavu
+            for fp in [
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+                "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+                "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf",
+            ]:
+                if os.path.exists(fp):
+                    return ImageFont.truetype(fp, size)
+        except: pass
         return ImageFont.load_default()
 
-    f_badge  = get_font(32)
-    f_harga  = get_font(86)
-    f_gram   = get_font(28)
-    f_judul1 = get_font(40)
-    f_judul2 = get_font(34)
-    f_sub    = get_font(26)
-    f_ch     = get_font(24)
-    f_tgl    = get_font(22)
+    # ════════ LAYER 4: BADGE STATUS (pojok kiri atas) ════════
+    badge_color  = sk["badge"]
+    badge_text   = sk["icon"]
+    badge_x, badge_y = 28, 28
+    badge_w, badge_h = 280, 72
 
+    # Shadow badge
+    _draw_rounded_rect(draw, badge_x+4, badge_y+4, badge_x+badge_w+4,
+                       badge_y+badge_h+4, 18, (0,0,0,120))
+    # Badge fill
+    _draw_rounded_rect(draw, badge_x, badge_y, badge_x+badge_w,
+                       badge_y+badge_h, 18, badge_color)
+    # Badge border aksen
+    _draw_rounded_rect_outline(draw, badge_x, badge_y, badge_x+badge_w,
+                                badge_y+badge_h, 18, sk["aksen"], 3)
     # Teks badge
-    draw.text((bx1+15, by1+18), icon_text, font=f_badge, fill=sk["hl_teks"])
+    f_badge = get_font(34)
+    draw.text((badge_x+18, badge_y+14), badge_text, font=f_badge,
+              fill=(255,255,255))
 
-    # Harga besar
-    h_val  = info['harga_sekarang']
-    h_text = f"Rp {h_val:,}".replace(",",".")
-    draw.text((30, 115), h_text, font=f_harga, fill=sk["teks"],
-              stroke_width=3, stroke_fill=(0,0,0))
+    # ════════ LAYER 5: HARGA BESAR (elemen utama) ════════
+    h_val    = info['harga_sekarang']
+    h_ribuan = f"{h_val:,}".replace(",",".")
+    h_line1  = "Rp"
+    h_line2  = h_ribuan
 
-    # Per gram
-    draw.text((32, 210), "/ gram  •  Antam Logam Mulia", font=f_gram, fill=sk["sub"])
+    f_rp    = get_font(52)
+    f_harga = get_font(110)
+    f_gram  = get_font(30)
 
-    # Selisih
+    # "Rp" kecil
+    _draw_text_shadow(draw, 28, 118, "Rp", f_rp, sk["sub"])
+    # Angka harga besar
+    _draw_text_shadow(draw, 28, 148, h_ribuan, f_harga, sk["teks"],
+                      stroke=4, stroke_color=(0,0,0))
+    # "/ gram"
+    _draw_text_shadow(draw, 32, 272, "/ gram  ·  Logam Mulia Antam", f_gram, sk["sub"])
+
+    # ════════ LAYER 6: Selisih harga ════════
     sel = info['selisih']
     if sel > 0:
-        sel_text = f"{'▲' if status=='Naik' else '▼'} Rp {sel:,}".replace(",",".")
-        draw.text((32, 250), sel_text, font=f_gram,
-                  fill=sk["aksen"] if status=="Naik" else (100,255,150))
+        sel_str  = f"Rp {sel:,}".replace(",",".")
+        sel_icon = "▲" if status == "Naik" else "▼"
+        sel_col  = (80,255,120) if status == "Naik" else (255,100,100)
+        f_sel    = get_font(38)
 
-    # Judul — bungkus 2 baris
-    words  = judul[:90].split()
-    baris1, baris2 = [], []
-    panjang = 0
-    for w in words:
-        if panjang + len(w) <= 28:
-            baris1.append(w); panjang += len(w)+1
-        else:
-            baris2.append(w)
-    j1 = ' '.join(baris1)
-    j2 = ' '.join(baris2)
+        # Pill background
+        pill_w = 280
+        _draw_rounded_rect(draw, 28, 315, 28+pill_w, 315+52, 26,
+                           (sel_col[0]//4, sel_col[1]//4, sel_col[2]//4))
+        _draw_rounded_rect_outline(draw, 28, 315, 28+pill_w, 315+52,
+                                   26, sel_col, 2)
+        draw.text((50, 322), f"{sel_icon} {sel_str}", font=f_sel, fill=sel_col)
 
-    # Shadow judul
-    for dx,dy in [(-2,-2),(2,2),(0,2),(2,0)]:
-        draw.text((32+dx, 300+dy), j1, font=f_judul1, fill=(0,0,0))
-    draw.text((32, 300), j1, font=f_judul1, fill=sk["hl_teks"])
-    if j2:
-        for dx,dy in [(-2,-2),(2,2)]:
-            draw.text((32+dx, 348+dy), j2, font=f_judul2, fill=(0,0,0))
-        draw.text((32, 348), j2, font=f_judul2, fill=sk["sub"])
+    # ════════ LAYER 7: JUDUL VIDEO ════════
+    # Area judul: x=28, y=390 s/d y=580
+    f_j1 = get_font(44)
+    f_j2 = get_font(38)
 
-    # Tanggal
-    tgl_text = datetime.now().strftime("%d %B %Y")
-    draw.text((32, 410), f"📅 {tgl_text}", font=f_tgl, fill=sk["sub"])
+    # Bungkus judul ke max 2 baris, max ~22 char per baris
+    judul_bersih = re.sub(r'[▲▼⬛🔥💥🚨🎯💰📊📈📉⚡😲🤔⬇️🟢🔴⚠️💡🛒]','', judul).strip()
+    baris        = _wrap_text(judul_bersih, 28)
 
-    # Nama channel (kanan bawah)
-    draw.text((W-260, H-50), NAMA_CHANNEL, font=f_ch, fill=sk["aksen"])
+    y_j = 390
+    for idx, baris_text in enumerate(baris[:3]):
+        font_j = f_j1 if idx == 0 else f_j2
+        col_j  = sk["hl_teks"] if idx == 0 else sk["sub"]
+        _draw_text_shadow(draw, 28, y_j, baris_text, font_j, col_j, stroke=2)
+        y_j += (50 if idx == 0 else 44)
 
-    # ── Panel kanan — statistik historis ──
-    hx = W//2 + 80
-    draw.text((hx, 30), "📊 Perubahan Harga", font=get_font(28), fill=sk["aksen"])
+    # ════════ LAYER 8: Panel kanan — Statistik historis ════════
+    px     = W // 2 + 40
+    py     = 30
+    pw     = W - px - 20
+    ph     = H - 60
 
-    historis = info.get("historis",{})
-    label_map = {"kemarin":"1 Hari","7_hari":"7 Hari","1_bulan":"1 Bulan",
-                 "3_bulan":"3 Bulan","6_bulan":"6 Bulan","1_tahun":"1 Tahun"}
-    y_pos = 75
-    for lb, nama in label_map.items():
+    # Panel kanan background semi-transparan
+    panel_r = Image.new('RGBA', (W, H), (0,0,0,0))
+    pd      = ImageDraw.Draw(panel_r)
+    _draw_rounded_rect(pd, px-20, py, px+pw+20, py+ph, 20, (0,0,0,150))
+    img     = Image.alpha_composite(img.convert('RGBA'), panel_r).convert('RGB')
+    draw    = ImageDraw.Draw(img)
+
+    # Judul panel
+    f_panel_title = get_font(28)
+    f_panel_item  = get_font(26)
+    f_panel_pct   = get_font(28)
+
+    draw.text((px, py+10), "📊 Perubahan Harga", font=f_panel_title, fill=sk["aksen"])
+
+    # Garis bawah judul panel
+    draw.line([(px, py+46), (px+pw, py+46)], fill=sk["aksen"], width=2)
+
+    historis  = info.get("historis",{})
+    label_map = [
+        ("kemarin",  "Kemarin",  "1H"),
+        ("7_hari",   "7 Hari",   "7H"),
+        ("1_bulan",  "1 Bulan",  "1B"),
+        ("3_bulan",  "3 Bulan",  "3B"),
+        ("6_bulan",  "6 Bulan",  "6B"),
+        ("1_tahun",  "1 Tahun",  "1T"),
+    ]
+
+    y_item = py + 60
+    for lb, nama_panjang, nama_pendek in label_map:
         d = historis.get(lb)
-        if not d: continue
+        if not d:
+            continue
         pct   = d["persen"]
         arah  = "▲" if d["naik"] else ("▼" if not d["stabil"] else "→")
-        warna = (100,255,120) if d["naik"] else ((255,100,100) if not d["stabil"] else (200,200,200))
-        draw.text((hx, y_pos),    f"{nama}:", font=get_font(24), fill=(200,200,200))
-        draw.text((hx+120, y_pos),f"{arah} {abs(pct):.1f}%", font=get_font(24), fill=warna)
-        y_pos += 38
-        if y_pos > H - 60: break
+        warna_pct = (80,255,120) if d["naik"] else ((255,100,100) if not d["stabil"] else (180,180,180))
 
-    # Garis bawah
-    draw.rectangle([0, H-6, W, H], fill=sk["aksen"])
+        # Row background alternating
+        if label_map.index((lb, nama_panjang, nama_pendek)) % 2 == 0:
+            row_overlay = Image.new('RGBA', (W, H), (0,0,0,0))
+            ro          = ImageDraw.Draw(row_overlay)
+            _draw_rounded_rect(ro, px-10, y_item-4, px+pw+10, y_item+38, 8, (255,255,255,18))
+            img  = Image.alpha_composite(img.convert('RGBA'), row_overlay).convert('RGB')
+            draw = ImageDraw.Draw(img)
 
-    img.save(output_path, "JPEG", quality=95)
-    log(f"  -> ✅ Thumbnail: {output_path} ({os.path.getsize(output_path)//1024} KB)")
+        draw.text((px+5, y_item),         nama_panjang+":", font=f_panel_item, fill=(210,210,210))
+        draw.text((px+pw-120, y_item),    f"{arah} {abs(pct):.1f}%", font=f_panel_pct, fill=warna_pct)
+
+        y_item += 44
+        if y_item > py + ph - 10:
+            break
+
+    # ════════ LAYER 9: Footer bar ════════
+    # Gradient bar bawah
+    for y in range(H-70, H):
+        alpha = int(200 * (y - (H-70)) / 70)
+        r,g,b = sk["bg_grad_atas"] if "bg_grad_atas" in sk else (0,0,0)
+        draw.line([(0,y),(W,y)], fill=(r,g,b))
+
+    # Nama channel & tanggal
+    f_footer = get_font(28)
+    f_tgl    = get_font(24)
+    tgl_str  = datetime.now().strftime("%d %B %Y")
+
+    draw.text((28, H-52), NAMA_CHANNEL, font=f_footer, fill=sk["aksen"])
+    draw.text((28, H-24), tgl_str,      font=f_tgl,    fill=(180,180,180))
+
+    # ════════ LAYER 10: Border tipis aksen ════════
+    draw.rectangle([0, 0, W-1, H-1], outline=sk["aksen"], width=4)
+
+    # ════════ SIMPAN ════════
+    img.save(output_path, "JPEG", quality=95, optimize=True)
+    size_kb = os.path.getsize(output_path) // 1024
+    log(f"  -> ✅ Thumbnail saved: {output_path} ({size_kb} KB)")
     return output_path
+
+
+# ════════════════════════════════════════════════════════════
+# HELPER FUNCTIONS untuk thumbnail
+# ════════════════════════════════════════════════════════════
+
+def _buat_gradient(w, h, sk):
+    """Buat gambar gradient sebagai fallback background."""
+    img  = Image.new('RGB', (w, h))
+    draw = ImageDraw.Draw(img)
+    c1   = sk.get("bg_grad_atas",   (30, 10, 0))
+    c2   = sk.get("bg_grad_bawah",  (5, 0, 0))
+    # Diagonal gradient
+    for y in range(h):
+        for x in range(0, w, 4):
+            t  = (x/w * 0.4 + y/h * 0.6)
+            r  = int(c1[0] + (c2[0]-c1[0]) * t)
+            g  = int(c1[1] + (c2[1]-c1[1]) * t)
+            b  = int(c1[2] + (c2[2]-c1[2]) * t)
+            draw.line([(x, y),(x+4, y)], fill=(r,g,b))
+    return img
+
+
+def _draw_rounded_rect(draw_or_img, x1, y1, x2, y2, radius, color):
+    """Gambar rectangle dengan sudut rounded, support RGBA."""
+    try:
+        if hasattr(draw_or_img, 'rounded_rectangle'):
+            draw_or_img.rounded_rectangle([x1, y1, x2, y2], radius=radius, fill=color)
+        else:
+            # Fallback manual
+            draw_or_img.rectangle([x1+radius, y1, x2-radius, y2], fill=color)
+            draw_or_img.rectangle([x1, y1+radius, x2, y2-radius], fill=color)
+            draw_or_img.ellipse([x1, y1, x1+radius*2, y1+radius*2], fill=color)
+            draw_or_img.ellipse([x2-radius*2, y1, x2, y1+radius*2], fill=color)
+            draw_or_img.ellipse([x1, y2-radius*2, x1+radius*2, y2], fill=color)
+            draw_or_img.ellipse([x2-radius*2, y2-radius*2, x2, y2], fill=color)
+    except Exception as e:
+        draw_or_img.rectangle([x1, y1, x2, y2], fill=color)
+
+
+def _draw_rounded_rect_outline(draw, x1, y1, x2, y2, radius, color, width=2):
+    """Gambar outline rounded rectangle."""
+    try:
+        if hasattr(draw, 'rounded_rectangle'):
+            draw.rounded_rectangle([x1, y1, x2, y2], radius=radius,
+                                   outline=color, width=width)
+    except:
+        draw.rectangle([x1, y1, x2, y2], outline=color, width=width)
+
+
+def _draw_text_shadow(draw, x, y, text, font, color,
+                      stroke=0, stroke_color=(0,0,0),
+                      shadow_offset=(3,3), shadow_color=(0,0,0,180)):
+    """Gambar teks dengan shadow dan optional stroke."""
+    # Shadow
+    sx, sy = shadow_offset
+    draw.text((x+sx, y+sy), text, font=font, fill=(0,0,0))
+    # Stroke
+    if stroke > 0:
+        for dx in range(-stroke, stroke+1):
+            for dy in range(-stroke, stroke+1):
+                if dx != 0 or dy != 0:
+                    draw.text((x+dx, y+dy), text, font=font, fill=stroke_color)
+    # Teks utama
+    draw.text((x, y), text, font=font, fill=color)
+
+
+def _wrap_text(text, max_chars_per_line=26):
+    """Bungkus teks ke beberapa baris."""
+    words  = text.split()
+    baris  = []
+    current= ""
+    for word in words:
+        test = (current + " " + word).strip()
+        if len(test) <= max_chars_per_line:
+            current = test
+        else:
+            if current:
+                baris.append(current)
+            current = word
+    if current:
+        baris.append(current)
+    return baris[:3]  # max 3 baris
 
 
 # ════════════════════════════════════════════════════════════

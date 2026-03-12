@@ -1,92 +1,135 @@
-name: 🎬 Auto Upload Video Emas Harian
+# .github/workflows/daily_video.yml
+name: Auto Upload Video Emas Harian
 
 on:
   schedule:
-    - cron: '0 2 * * *'
+    # Jam 07:00 WIB = 00:00 UTC
+    - cron: "0 2 * * *"
   workflow_dispatch:
-
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    inputs:
+      channel_id:
+        description: "Channel ID (1-5), kosong = semua channel"
+        required: false
+        default: ""
 
 jobs:
-  buat-dan-upload-video:
+  # ═══════════════════════════════════════════════════════
+  # JOB MATRIX — jalankan semua channel secara paralel
+  # ═══════════════════════════════════════════════════════
+  upload_video:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        channel_id: [1, 2, 3, 4, 5]
+
+    name: "Channel ${{ matrix.channel_id }}"
 
     steps:
-      - name: 📥 Checkout repo
+      # ── 1. Checkout repo ──────────────────────────────
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: 🐍 Setup Python 3.11
+      # ── 2. Python setup ───────────────────────────────
+      - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          cache: 'pip'
+          python-version: "3.11"
 
-      - name: 🎬 Install FFmpeg
-        run: sudo apt-get install -y ffmpeg
+      # ── 3. Cache pip ──────────────────────────────────
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
 
-      - name: 📦 Install dependencies Python
+      # ── 4. Cache bank gambar & video ──────────────────
+      - name: Cache Bank Gambar
+        uses: actions/cache@v4
+        with:
+          path: gambar_bank/
+          key: gambar-bank-ch${{ matrix.channel_id }}-${{ github.run_number }}
+          restore-keys: |
+            gambar-bank-ch${{ matrix.channel_id }}-
+
+      - name: Cache Bank Video
+        uses: actions/cache@v4
+        with:
+          path: video_bank/
+          key: video-bank-ch${{ matrix.channel_id }}-${{ github.run_number }}
+          restore-keys: |
+            video-bank-ch${{ matrix.channel_id }}-
+
+      # ── 5. Cache history harga ────────────────────────
+      - name: Cache History Harga
+        uses: actions/cache@v4
+        with:
+          path: history_harga.json
+          key: history-harga-ch${{ matrix.channel_id }}-${{ github.run_number }}
+          restore-keys: |
+            history-harga-ch${{ matrix.channel_id }}-
+
+      # ── 6. Install dependencies ───────────────────────
+      - name: Install Dependencies
         run: |
-          pip install requests beautifulsoup4 edge-tts \
-            google-api-python-client google-auth-oauthlib Pillow
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg fonts-dejavu-core \
+            fonts-liberation python3-dev
+          pip install --upgrade pip
+          pip install -r requirements.txt
 
-      - name: 🎨 Install font untuk thumbnail
+      # ── 7. Verifikasi tools ───────────────────────────
+      - name: Verifikasi Instalasi
         run: |
-          sudo apt-get install -y fonts-open-sans fonts-liberation || true
-          fc-cache -fv || true
-
-      - name: 🔑 Setup credentials
-        env:
-          YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-        run: |
-          echo "$YOUTUBE_TOKEN_JSON" > youtube_token.json
-          echo "GEMINI_API_KEY=$GEMINI_API_KEY" >> $GITHUB_ENV
-          echo "PEXELS_API_KEY=$PEXELS_API_KEY" >> $GITHUB_ENV
-
-      - name: 🔍 Verifikasi secrets
-        env:
-          GEMINI_API_KEY: ${{ env.GEMINI_API_KEY }}
-          PEXELS_API_KEY: ${{ env.PEXELS_API_KEY }}
-        run: |
-          [ -z "$GEMINI_API_KEY" ]  && echo "❌ GEMINI_API_KEY KOSONG!"  || echo "✅ GEMINI_API_KEY OK (${#GEMINI_API_KEY} char)"
-          [ -z "$PEXELS_API_KEY" ]  && echo "❌ PEXELS_API_KEY KOSONG!"  || echo "✅ PEXELS_API_KEY OK (${#PEXELS_API_KEY} char)"
-          ls -la youtube_token.json && echo "✅ youtube_token.json OK" || echo "❌ Token tidak ada!"
           ffmpeg -version | head -1
-          python --version
+          ffprobe -version | head -1
+          python -c "import edge_tts; print('edge-tts OK')"
+          python -c "from PIL import Image; print('Pillow OK')"
+          python -c "from bs4 import BeautifulSoup; print('bs4 OK')"
+          python -c "import requests; print('requests OK')"
+          fc-list | grep -i dejavu | head -3
 
-      - name: 🚀 Jalankan script pembuat video
-        run: python video_maker.py
-
-      - name: 🔍 Debug — cek file hasil
-        if: always()
+      # ── 8. Jalankan video maker ───────────────────────
+      - name: Run Video Maker - Channel ${{ matrix.channel_id }}
+        env:
+          CHANNEL_ID:                 ${{ matrix.channel_id }}
+          GEMINI_API_KEY:             ${{ secrets.GEMINI_API_KEY }}
+          PEXELS_API_KEY:             ${{ secrets.PEXELS_API_KEY }}
+          YOUTUBE_TOKEN_JSON:         ${{ secrets[format('YOUTUBE_TOKEN_JSON_CH{0}', matrix.channel_id)] }}
+          YOUTUBE_CLIENT_SECRET_JSON: ${{ secrets.YOUTUBE_CLIENT_SECRET_JSON }}
         run: |
-          echo "=== File video ==="
-          ls -lh Video_Emas_*.mp4 2>/dev/null || echo "❌ Tidak ada file video!"
-          echo "=== File thumbnail ==="
-          ls -lh thumbnail_*.jpg 2>/dev/null || echo "Tidak ada thumbnail"
-          echo "=== Upload history ==="
-          cat upload_history.json 2>/dev/null || echo "Belum ada upload history"
-          echo "=== Storage ==="
-          du -sh gambar_bank/ video_bank/ 2>/dev/null || true
+          echo "======================================"
+          echo " CHANNEL ${{ matrix.channel_id }} START"
+          echo " $(date '+%Y-%m-%d %H:%M:%S WIB')"
+          echo "======================================"
+          python video_maker.py
+          echo "======================================"
+          echo " CHANNEL ${{ matrix.channel_id }} DONE"
+          echo "======================================"
 
-      - name: 📋 Log FFmpeg jika error
+      # ── 9. Upload artifacts jika gagal ───────────────
+      - name: Upload FFmpeg Log (jika gagal)
         if: failure()
-        run: |
-          echo "=== FFMPEG LOG ==="
-          cat ffmpeg_log.txt 2>/dev/null | tail -100 || echo "Log tidak ditemukan"
-
-      - name: 💾 Backup video sebagai artifact
-        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: video-emas-${{ github.run_number }}
-          path: |
-            Video_Emas_*.mp4
-            thumbnail_*.jpg
-            ffmpeg_log.txt
-            upload_history.json
-          if-no-files-found: warn
-          retention-days: 5
+          name: ffmpeg-log-ch${{ matrix.channel_id }}
+          path: ffmpeg_log.txt
+          retention-days: 3
+
+      - name: Upload Video (jika berhasil)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: video-ch${{ matrix.channel_id }}-${{ github.run_number }}
+          path: "Video_Emas_*.mp4"
+          retention-days: 1
+
+      - name: Upload Thumbnail (jika berhasil)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: thumb-ch${{ matrix.channel_id }}-${{ github.run_number }}
+          path: "thumbnail_*.jpg"
+          retention-days: 3

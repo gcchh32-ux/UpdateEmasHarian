@@ -1,135 +1,166 @@
 # .github/workflows/daily_video.yml
+# Versi: 1 Repo = 1 Channel — Lebih aman, tidak kena ban
 name: Auto Upload Video Emas Harian
 
 on:
   schedule:
-    # Jam 07:00 WIB = 00:00 UTC
-    - cron: "0 2 * * *"
-  workflow_dispatch:
-    inputs:
-      channel_id:
-        description: "Channel ID (1-5), kosong = semua channel"
-        required: false
-        default: ""
+    # Sesuaikan jam per channel agar tidak bentrok:
+    # CH1 → 07:00 WIB (00:00 UTC)
+    # CH2 → 07:30 WIB (00:30 UTC)
+    # CH3 → 08:00 WIB (01:00 UTC)
+    # CH4 → 08:30 WIB (01:30 UTC)
+    # CH5 → 09:00 WIB (02:00 UTC)
+    - cron: "0 2 * * *"   # Ganti per repo sesuai channel
+
+  workflow_dispatch:        # Bisa trigger manual kapan saja
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true   # Fix warning Node.js
 
 jobs:
-  # ═══════════════════════════════════════════════════════
-  # JOB MATRIX — jalankan semua channel secara paralel
-  # ═══════════════════════════════════════════════════════
   upload_video:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        channel_id: [1, 2, 3, 4, 5]
-
-    name: "Channel ${{ matrix.channel_id }}"
+    name: "Upload Video Harian"
+    timeout-minutes: 60
 
     steps:
-      # ── 1. Checkout repo ──────────────────────────────
+      # ── 1. Checkout ──────────────────────────────────
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # ── 2. Python setup ───────────────────────────────
+      # ── 2. Python ────────────────────────────────────
       - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # ── 3. Cache pip ──────────────────────────────────
-      - name: Cache pip packages
+      # ── 3. Cache pip ─────────────────────────────────
+      - name: Cache pip
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+          key: pip-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+          restore-keys: pip-${{ runner.os }}-
 
-      # ── 4. Cache bank gambar & video ──────────────────
+      # ── 4. Cache bank gambar ──────────────────────────
       - name: Cache Bank Gambar
         uses: actions/cache@v4
         with:
           path: gambar_bank/
-          key: gambar-bank-ch${{ matrix.channel_id }}-${{ github.run_number }}
-          restore-keys: |
-            gambar-bank-ch${{ matrix.channel_id }}-
+          key: gambar-${{ github.run_number }}
+          restore-keys: gambar-
 
+      # ── 5. Cache bank video ───────────────────────────
       - name: Cache Bank Video
         uses: actions/cache@v4
         with:
           path: video_bank/
-          key: video-bank-ch${{ matrix.channel_id }}-${{ github.run_number }}
-          restore-keys: |
-            video-bank-ch${{ matrix.channel_id }}-
+          key: video-${{ github.run_number }}
+          restore-keys: video-
 
-      # ── 5. Cache history harga ────────────────────────
+      # ── 6. Cache history harga ────────────────────────
       - name: Cache History Harga
         uses: actions/cache@v4
         with:
           path: history_harga.json
-          key: history-harga-ch${{ matrix.channel_id }}-${{ github.run_number }}
-          restore-keys: |
-            history-harga-ch${{ matrix.channel_id }}-
+          key: history-${{ github.run_number }}
+          restore-keys: history-
 
-      # ── 6. Install dependencies ───────────────────────
-      - name: Install Dependencies
+      # ── 7. Install system deps ────────────────────────
+      - name: Install System Dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y ffmpeg fonts-dejavu-core \
-            fonts-liberation python3-dev
-          pip install --upgrade pip
-          pip install -r requirements.txt
+          sudo apt-get install -y \
+            ffmpeg \
+            fonts-dejavu-core \
+            fonts-liberation \
+            python3-dev \
+            --no-install-recommends
+          echo "✅ ffmpeg: $(ffmpeg -version 2>&1 | head -1)"
 
-      # ── 7. Verifikasi tools ───────────────────────────
-      - name: Verifikasi Instalasi
+      # ── 8. Install Python deps ────────────────────────
+      - name: Install Python Dependencies
         run: |
-          ffmpeg -version | head -1
-          ffprobe -version | head -1
-          python -c "import edge_tts; print('edge-tts OK')"
-          python -c "from PIL import Image; print('Pillow OK')"
-          python -c "from bs4 import BeautifulSoup; print('bs4 OK')"
-          python -c "import requests; print('requests OK')"
-          fc-list | grep -i dejavu | head -3
+          pip install --upgrade pip --quiet
+          pip install -r requirements.txt --quiet
+          python -c "import edge_tts;   print('✅ edge-tts OK')"
+          python -c "from PIL import Image; print('✅ Pillow OK')"
+          python -c "from bs4 import BeautifulSoup; print('✅ bs4 OK')"
+          python -c "import requests;   print('✅ requests OK')"
 
-      # ── 8. Jalankan video maker ───────────────────────
-      - name: Run Video Maker - Channel ${{ matrix.channel_id }}
+      # ── 9. Cek secrets tersedia ───────────────────────
+      - name: Cek Secrets
         env:
-          CHANNEL_ID:                 ${{ matrix.channel_id }}
+          GEMINI_OK:    ${{ secrets.GEMINI_API_KEY != '' }}
+          PEXELS_OK:    ${{ secrets.PEXELS_API_KEY != '' }}
+          TOKEN_OK:     ${{ secrets.YOUTUBE_TOKEN_JSON != '' }}
+          SECRET_OK:    ${{ secrets.YOUTUBE_CLIENT_SECRET_JSON != '' }}
+        run: |
+          echo "GEMINI_API_KEY         : $GEMINI_OK"
+          echo "PEXELS_API_KEY         : $PEXELS_OK"
+          echo "YOUTUBE_TOKEN_JSON     : $TOKEN_OK"
+          echo "CLIENT_SECRET_JSON     : $SECRET_OK"
+          if [ "$TOKEN_OK" = "false" ]; then
+            echo "❌ YOUTUBE_TOKEN_JSON kosong! Isi dulu di Secrets."
+            exit 1
+          fi
+
+      # ── 10. Run video maker ───────────────────────────
+      - name: Run Video Maker
+        env:
+          CHANNEL_ID:                 ${{ vars.CHANNEL_ID }}
           GEMINI_API_KEY:             ${{ secrets.GEMINI_API_KEY }}
           PEXELS_API_KEY:             ${{ secrets.PEXELS_API_KEY }}
-          YOUTUBE_TOKEN_JSON:         ${{ secrets[format('YOUTUBE_TOKEN_JSON_CH{0}', matrix.channel_id)] }}
+          YOUTUBE_TOKEN_JSON:         ${{ secrets.YOUTUBE_TOKEN_JSON }}
           YOUTUBE_CLIENT_SECRET_JSON: ${{ secrets.YOUTUBE_CLIENT_SECRET_JSON }}
         run: |
           echo "======================================"
-          echo " CHANNEL ${{ matrix.channel_id }} START"
-          echo " $(date '+%Y-%m-%d %H:%M:%S WIB')"
+          echo " CHANNEL ID : $CHANNEL_ID"
+          echo " WAKTU      : $(date '+%Y-%m-%d %H:%M:%S')"
           echo "======================================"
           python video_maker.py
-          echo "======================================"
-          echo " CHANNEL ${{ matrix.channel_id }} DONE"
-          echo "======================================"
 
-      # ── 9. Upload artifacts jika gagal ───────────────
+      # ── 11. Upload artifact jika GAGAL ───────────────
       - name: Upload FFmpeg Log (jika gagal)
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: ffmpeg-log-ch${{ matrix.channel_id }}
-          path: ffmpeg_log.txt
+          name: ffmpeg-log-${{ github.run_number }}
+          path: |
+            ffmpeg_log.txt
+            *.log
+          if-no-files-found: ignore   # ← Fix error "No files found"
           retention-days: 3
 
-      - name: Upload Video (jika berhasil)
+      # ── 12. Upload artifact jika SUKSES ──────────────
+      - name: Upload Thumbnail (jika sukses)
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: video-ch${{ matrix.channel_id }}-${{ github.run_number }}
-          path: "Video_Emas_*.mp4"
-          retention-days: 1
-
-      - name: Upload Thumbnail (jika berhasil)
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: thumb-ch${{ matrix.channel_id }}-${{ github.run_number }}
+          name: thumbnail-${{ github.run_number }}
           path: "thumbnail_*.jpg"
-          retention-days: 3
+          if-no-files-found: ignore   # ← Fix error "No files found"
+          retention-days: 7
+
+      # ── 13. Ringkasan hasil ───────────────────────────
+      - name: Ringkasan
+        if: always()
+        run: |
+          echo "======================================"
+          echo " STATUS AKHIR"
+          echo "======================================"
+          ls -lh Video_Emas_*.mp4 2>/dev/null  \
+            && echo "✅ Video berhasil dibuat" \
+            || echo "❌ Video tidak ditemukan"
+          ls -lh thumbnail_*.jpg 2>/dev/null   \
+            && echo "✅ Thumbnail berhasil dibuat" \
+            || echo "⚠️  Thumbnail tidak ditemukan"
+          cat upload_history.json 2>/dev/null  \
+            | python -c "
+          import json,sys
+          try:
+            d=json.load(sys.stdin)
+            if d: print('✅ Upload OK:', d[0].get('url','?'))
+          except: pass
+          " || true
+          echo "======================================"

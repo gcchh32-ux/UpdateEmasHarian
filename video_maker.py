@@ -1,13 +1,14 @@
-# video_maker.py — MAIN ORCHESTRATOR v7.2
+# video_maker.py — MAIN ORCHESTRATOR
 import os, glob, asyncio
 from datetime import datetime
 from config   import NAMA_CHANNEL, CHANNEL_ID, NARASI_GAYA, CFG, FFMPEG_LOG
-from storage  import kelola_bank_gambar, kelola_bank_video, kelola_video_lama, debug_storage
-from scraper  import scrape_dan_kalkulasi_harga
+from store    import kelola_bank_gambar, kelola_bank_video, kelola_video_lama, debug_storage
+from scrape   import scrape_dan_kalkulasi_harga
 from narasi   import buat_narasi_dan_judul
-from renderer import buat_suara, proses_semua_klip, render_video_final
-from thumb import buat_thumbnail
-from uploader  import upload_ke_youtube
+from render   import buat_suara, proses_semua_klip, render_video_final
+from thumb    import buat_thumbnail
+from uploader import upload_ke_youtube
+
 
 def bersihkan_temp(file_list=None, audio=None):
     import shutil
@@ -116,4 +117,5 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 

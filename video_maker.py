@@ -9,6 +9,16 @@ from render   import buat_suara, proses_semua_klip, render_video_final
 from thumb    import buat_thumbnail
 from uploader import upload_ke_youtube
 
+# Cek apakah ada video hasil render yang belum terupload
+def cek_video_pending():
+    videos = sorted(glob.glob("Video_Emas_*.mp4"), reverse=True)
+    if videos:
+        v = videos[0]
+        size_mb = os.path.getsize(v) // 1024 // 1024
+        log(f"[!] Ditemukan video pending: {v} ({size_mb} MB)")
+        return v
+    return None
+    
 
 def bersihkan_temp(file_list=None, audio=None):
     import shutil
@@ -117,5 +127,6 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 

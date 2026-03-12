@@ -1,48 +1,33 @@
 # .github/workflows/daily_video.yml
-# Versi: 1 Repo = 1 Channel — Lebih aman, tidak kena ban
-name: Auto Upload Video Emas Harian
+name: Auto Upload Video Emas
 
 on:
   schedule:
-    # Sesuaikan jam per channel agar tidak bentrok:
-    # CH1 → 07:00 WIB (00:00 UTC)
-    # CH2 → 07:30 WIB (00:30 UTC)
-    # CH3 → 08:00 WIB (01:00 UTC)
-    # CH4 → 08:30 WIB (01:30 UTC)
-    # CH5 → 09:00 WIB (02:00 UTC)
-    - cron: "0 2 * * *"   # Ganti per repo sesuai channel
-
-  workflow_dispatch:        # Bisa trigger manual kapan saja
+    - cron: "0 2 * * *"   # Jam 07:00 WIB — sama semua repo, beda akun jadi tidak masalah
+  workflow_dispatch:
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true   # Fix warning Node.js
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  upload_video:
+  upload:
     runs-on: ubuntu-latest
-    name: "Upload Video Harian"
-    timeout-minutes: 60
+    timeout-minutes: 55
 
     steps:
-      # ── 1. Checkout ──────────────────────────────────
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # ── 2. Python ────────────────────────────────────
-      - name: Setup Python 3.11
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # ── 3. Cache pip ─────────────────────────────────
       - name: Cache pip
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: pip-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
-          restore-keys: pip-${{ runner.os }}-
+          key: pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: pip-
 
-      # ── 4. Cache bank gambar ──────────────────────────
       - name: Cache Bank Gambar
         uses: actions/cache@v4
         with:
@@ -50,7 +35,6 @@ jobs:
           key: gambar-${{ github.run_number }}
           restore-keys: gambar-
 
-      # ── 5. Cache bank video ───────────────────────────
       - name: Cache Bank Video
         uses: actions/cache@v4
         with:
@@ -58,7 +42,6 @@ jobs:
           key: video-${{ github.run_number }}
           restore-keys: video-
 
-      # ── 6. Cache history harga ────────────────────────
       - name: Cache History Harga
         uses: actions/cache@v4
         with:
@@ -66,46 +49,12 @@ jobs:
           key: history-${{ github.run_number }}
           restore-keys: history-
 
-      # ── 7. Install system deps ────────────────────────
-      - name: Install System Dependencies
+      - name: Install Dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y \
-            ffmpeg \
-            fonts-dejavu-core \
-            fonts-liberation \
-            python3-dev \
-            --no-install-recommends
-          echo "✅ ffmpeg: $(ffmpeg -version 2>&1 | head -1)"
-
-      # ── 8. Install Python deps ────────────────────────
-      - name: Install Python Dependencies
-        run: |
-          pip install --upgrade pip --quiet
+          sudo apt-get install -y ffmpeg fonts-dejavu-core --no-install-recommends
           pip install -r requirements.txt --quiet
-          python -c "import edge_tts;   print('✅ edge-tts OK')"
-          python -c "from PIL import Image; print('✅ Pillow OK')"
-          python -c "from bs4 import BeautifulSoup; print('✅ bs4 OK')"
-          python -c "import requests;   print('✅ requests OK')"
 
-      # ── 9. Cek secrets tersedia ───────────────────────
-      - name: Cek Secrets
-        env:
-          GEMINI_OK:    ${{ secrets.GEMINI_API_KEY != '' }}
-          PEXELS_OK:    ${{ secrets.PEXELS_API_KEY != '' }}
-          TOKEN_OK:     ${{ secrets.YOUTUBE_TOKEN_JSON != '' }}
-          SECRET_OK:    ${{ secrets.YOUTUBE_CLIENT_SECRET_JSON != '' }}
-        run: |
-          echo "GEMINI_API_KEY         : $GEMINI_OK"
-          echo "PEXELS_API_KEY         : $PEXELS_OK"
-          echo "YOUTUBE_TOKEN_JSON     : $TOKEN_OK"
-          echo "CLIENT_SECRET_JSON     : $SECRET_OK"
-          if [ "$TOKEN_OK" = "false" ]; then
-            echo "❌ YOUTUBE_TOKEN_JSON kosong! Isi dulu di Secrets."
-            exit 1
-          fi
-
-      # ── 10. Run video maker ───────────────────────────
       - name: Run Video Maker
         env:
           CHANNEL_ID:                 ${{ vars.CHANNEL_ID }}
@@ -113,54 +62,22 @@ jobs:
           PEXELS_API_KEY:             ${{ secrets.PEXELS_API_KEY }}
           YOUTUBE_TOKEN_JSON:         ${{ secrets.YOUTUBE_TOKEN_JSON }}
           YOUTUBE_CLIENT_SECRET_JSON: ${{ secrets.YOUTUBE_CLIENT_SECRET_JSON }}
-        run: |
-          echo "======================================"
-          echo " CHANNEL ID : $CHANNEL_ID"
-          echo " WAKTU      : $(date '+%Y-%m-%d %H:%M:%S')"
-          echo "======================================"
-          python video_maker.py
+        run: python video_maker.py
 
-      # ── 11. Upload artifact jika GAGAL ───────────────
-      - name: Upload FFmpeg Log (jika gagal)
+      - name: Upload Log (gagal)
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: ffmpeg-log-${{ github.run_number }}
-          path: |
-            ffmpeg_log.txt
-            *.log
-          if-no-files-found: ignore   # ← Fix error "No files found"
+          name: log-${{ github.run_number }}
+          path: "*.txt"
+          if-no-files-found: ignore
           retention-days: 3
 
-      # ── 12. Upload artifact jika SUKSES ──────────────
-      - name: Upload Thumbnail (jika sukses)
+      - name: Upload Thumbnail (sukses)
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: thumbnail-${{ github.run_number }}
+          name: thumb-${{ github.run_number }}
           path: "thumbnail_*.jpg"
-          if-no-files-found: ignore   # ← Fix error "No files found"
+          if-no-files-found: ignore
           retention-days: 7
-
-      # ── 13. Ringkasan hasil ───────────────────────────
-      - name: Ringkasan
-        if: always()
-        run: |
-          echo "======================================"
-          echo " STATUS AKHIR"
-          echo "======================================"
-          ls -lh Video_Emas_*.mp4 2>/dev/null  \
-            && echo "✅ Video berhasil dibuat" \
-            || echo "❌ Video tidak ditemukan"
-          ls -lh thumbnail_*.jpg 2>/dev/null   \
-            && echo "✅ Thumbnail berhasil dibuat" \
-            || echo "⚠️  Thumbnail tidak ditemukan"
-          cat upload_history.json 2>/dev/null  \
-            | python -c "
-          import json,sys
-          try:
-            d=json.load(sys.stdin)
-            if d: print('✅ Upload OK:', d[0].get('url','?'))
-          except: pass
-          " || true
-          echo "======================================"

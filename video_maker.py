@@ -1336,314 +1336,638 @@ def render_video_final(file_list, audio, output, durasi):
 # ════════════════════════════════════════════════════════════
 
 def buat_thumbnail(info, judul, output_path="thumbnail.jpg"):
-    log("[+] Membuat thumbnail profesional...")
-    try:
-        from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance, ImageOps
-    except ImportError:
-        log("  -> Pillow tidak tersedia, skip thumbnail.")
-        return None
+    log("[+] Membuat thumbnail...")
+    TEMPLATE_MAP = {
+        1: _thumb_template_bold_left,        # Harga besar kiri, foto kanan
+        2: _thumb_template_center_split,     # Split 50/50 dengan diagonal
+        3: _thumb_template_dark_minimal,     # Minimalis gelap, teks tengah
+        4: _thumb_template_neon_energy,      # Neon glow, energik
+        5: _thumb_template_warm_card,        # Kartu hangat bergaya magazine
+    }
+    fn = TEMPLATE_MAP.get(CHANNEL_ID, _thumb_template_bold_left)
+    return fn(info, judul, output_path)
 
-    status = info['status']
-    sk     = SKEMA_AKTIF.get(status, SKEMA_AKTIF.get("Stabil"))
+
+# ══════════════════════════════════════════════════
+# TEMPLATE 1 — Bold Left (Sobat Antam)
+# Layout: Bar aksen | Harga besar kiri | Foto blur kanan
+# Warna: Merah-Emas, font besar aggressive
+# ══════════════════════════════════════════════════
+def _thumb_template_bold_left(info, judul, output_path):
+    from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
     W, H   = 1280, 720
+    sk     = SKEMA_AKTIF.get(info['status'], SKEMA_AKTIF['Stabil'])
+    img    = _buat_bg_foto_blur(W, H, kanan_saja=True, brightness=0.3)
+    draw   = ImageDraw.Draw(img)
 
-    # ════════ LAYER 1: Background foto blur ════════
-    gambar_bg = _list_gambar()
-    if gambar_bg:
-        try:
-            bg = Image.open(random.choice(gambar_bg)).convert('RGB')
-            # Crop center agar tidak distorsi
-            bg_ratio = bg.width / bg.height
-            th_ratio = W / H
-            if bg_ratio > th_ratio:
-                new_w = int(bg.height * th_ratio)
-                left  = (bg.width - new_w) // 2
-                bg    = bg.crop((left, 0, left + new_w, bg.height))
-            else:
-                new_h = int(bg.width / th_ratio)
-                top   = (bg.height - new_h) // 2
-                bg    = bg.crop((0, top, bg.width, top + new_h))
-            bg = bg.resize((W, H), Image.LANCZOS)
-            bg = bg.filter(ImageFilter.GaussianBlur(radius=8))
-            bg = ImageEnhance.Brightness(bg).enhance(0.25)
-            img = bg.copy()
-        except Exception as e:
-            log(f"  -> Background foto gagal ({e}), pakai gradient")
-            img = _buat_gradient(W, H, sk)
-    else:
-        img = _buat_gradient(W, H, sk)
+    # Panel kiri solid gelap
+    panel = Image.new('RGBA', (W, H), (0,0,0,0))
+    pd    = ImageDraw.Draw(panel)
+    pd.rectangle([0, 0, W//2+100, H], fill=(10, 5, 0, 230))
+    img   = Image.alpha_composite(img.convert('RGBA'), panel).convert('RGB')
+    draw  = ImageDraw.Draw(img)
 
-    draw = ImageDraw.Draw(img)
+    # Accent bar kiri TEBAL
+    for x in range(22):
+        draw.line([(x, 0), (x, H)], fill=sk["aksen"])
 
-    # ════════ LAYER 2: Overlay gelap gradient kiri→kanan ════════
-    overlay = Image.new('RGBA', (W, H), (0, 0, 0, 0))
-    od      = ImageDraw.Draw(overlay)
-    # Sisi kiri lebih gelap, kanan transparan
-    for x in range(W):
-        alpha = int(220 * (1 - x / W * 0.6))
-        od.line([(x, 0), (x, H)], fill=(0, 0, 0, alpha))
-    img = Image.alpha_composite(img.convert('RGBA'), overlay).convert('RGB')
-    draw = ImageDraw.Draw(img)
+    fp   = _font_path()
+    rp   = lambda x: f"Rp {x:,}".replace(",",".")
+    h    = info['harga_sekarang']
+    st   = info['status']
 
-    # ════════ LAYER 3: Accent bar kiri ════════
-    # Bar tebal dengan gradient warna
-    for x in range(18):
-        alpha = int(255 * (1 - x / 18 * 0.3))
-        r,g,b = sk["aksen"]
-        draw.line([(x, 0), (x, H)], fill=(r, g, b))
-
-    # ════════ FONT SETUP ════════
-    font_path = os.path.abspath("font_temp.ttf") if os.path.exists("font_temp.ttf") else None
-
-    def get_font(size):
-        if font_path:
-            try: return ImageFont.truetype(font_path, size)
-            except: pass
-        try:
-            # Coba font sistem Ubuntu/Dejavu
-            for fp in [
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-                "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-                "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf",
-            ]:
-                if os.path.exists(fp):
-                    return ImageFont.truetype(fp, size)
-        except: pass
-        return ImageFont.load_default()
-
-    # ════════ LAYER 4: BADGE STATUS (pojok kiri atas) ════════
-    badge_color  = sk["badge"]
-    badge_text   = sk["icon"]
-    badge_x, badge_y = 28, 28
-    badge_w, badge_h = 280, 72
-
-    # Shadow badge
-    _draw_rounded_rect(draw, badge_x+4, badge_y+4, badge_x+badge_w+4,
-                       badge_y+badge_h+4, 18, (0,0,0,120))
-    # Badge fill
-    _draw_rounded_rect(draw, badge_x, badge_y, badge_x+badge_w,
-                       badge_y+badge_h, 18, badge_color)
-    # Badge border aksen
-    _draw_rounded_rect_outline(draw, badge_x, badge_y, badge_x+badge_w,
-                                badge_y+badge_h, 18, sk["aksen"], 3)
-    # Teks badge
-    f_badge = get_font(34)
-    draw.text((badge_x+18, badge_y+14), badge_text, font=f_badge,
-              fill=(255,255,255))
-
-    # ════════ LAYER 5: HARGA BESAR (elemen utama) ════════
-    h_val    = info['harga_sekarang']
-    h_ribuan = f"{h_val:,}".replace(",",".")
-    h_line1  = "Rp"
-    h_line2  = h_ribuan
-
-    f_rp    = get_font(52)
-    f_harga = get_font(110)
-    f_gram  = get_font(30)
+    # Badge naik/turun
+    bw, bh = 240, 64
+    _draw_rounded_rect_solid(draw, 28, 28, 28+bw, 28+bh, 16, sk["badge"])
+    _draw_rounded_rect_solid(draw, 28, 28, 28+bw, 28+bh, 16, None,
+                              outline=sk["aksen"], width=3)
+    draw.text((46, 40), sk["icon"], font=_get_font(fp, 32), fill=(255,255,255))
 
     # "Rp" kecil
-    _draw_text_shadow(draw, 28, 118, "Rp", f_rp, sk["sub"])
-    # Angka harga besar
-    _draw_text_shadow(draw, 28, 148, h_ribuan, f_harga, sk["teks"],
-                      stroke=4, stroke_color=(0,0,0))
-    # "/ gram"
-    _draw_text_shadow(draw, 32, 272, "/ gram  ·  Logam Mulia Antam", f_gram, sk["sub"])
+    draw.text((28, 110), "Rp", font=_get_font(fp, 46), fill=sk["sub"])
+    # Harga BESAR
+    _text_stroke(draw, 28, 148, rp(h).replace("Rp ",""),
+                 _get_font(fp, 108), sk["teks"], stroke=4)
+    # /gram
+    draw.text((32, 268), "/ gram  ·  Antam", font=_get_font(fp, 28), fill=sk["sub"])
 
-    # ════════ LAYER 6: Selisih harga ════════
+    # Pill selisih
     sel = info['selisih']
     if sel > 0:
-        sel_str  = f"Rp {sel:,}".replace(",",".")
-        sel_icon = "▲" if status == "Naik" else "▼"
-        sel_col  = (80,255,120) if status == "Naik" else (255,100,100)
-        f_sel    = get_font(38)
+        s_col = (80,255,120) if st=="Naik" else (255,100,100)
+        _draw_rounded_rect_solid(draw, 28, 308, 310, 360, 26,
+                                  (s_col[0]//5, s_col[1]//5, s_col[2]//5))
+        _draw_rounded_rect_solid(draw, 28, 308, 310, 360, 26,
+                                  None, outline=s_col, width=2)
+        arah = "▲" if st=="Naik" else "▼"
+        draw.text((48, 316), f"{arah} {rp(sel)}", font=_get_font(fp,34), fill=s_col)
 
-        # Pill background
-        pill_w = 280
-        _draw_rounded_rect(draw, 28, 315, 28+pill_w, 315+52, 26,
-                           (sel_col[0]//4, sel_col[1]//4, sel_col[2]//4))
-        _draw_rounded_rect_outline(draw, 28, 315, 28+pill_w, 315+52,
-                                   26, sel_col, 2)
-        draw.text((50, 322), f"{sel_icon} {sel_str}", font=f_sel, fill=sel_col)
+    # Judul 2 baris
+    jb = _wrap_text(re.sub(r'[^\w\s\-\.,!?%]','', judul), 24)
+    _text_stroke(draw, 28, 390, jb[0] if jb else "", _get_font(fp, 42), (255,255,255), 2)
+    if len(jb)>1:
+        draw.text((28, 440), jb[1], font=_get_font(fp, 34), fill=sk["sub"])
 
-    # ════════ LAYER 7: JUDUL VIDEO ════════
-    # Area judul: x=28, y=390 s/d y=580
-    f_j1 = get_font(44)
-    f_j2 = get_font(38)
+    # Tanggal + channel
+    draw.text((28, H-52), NAMA_CHANNEL, font=_get_font(fp, 26), fill=sk["aksen"])
+    draw.text((28, H-24), datetime.now().strftime("%d %B %Y"),
+              font=_get_font(fp, 20), fill=(160,160,160))
 
-    # Bungkus judul ke max 2 baris, max ~22 char per baris
-    judul_bersih = re.sub(r'[▲▼⬛🔥💥🚨🎯💰📊📈📉⚡😲🤔⬇️🟢🔴⚠️💡🛒]','', judul).strip()
-    baris        = _wrap_text(judul_bersih, 28)
+    # Panel kanan: statistik historis
+    _draw_historis_panel(draw, img, info, fp, sk,
+                         px=W//2+120, py=30, pw=W//2-140, ph=H-60)
 
-    y_j = 390
-    for idx, baris_text in enumerate(baris[:3]):
-        font_j = f_j1 if idx == 0 else f_j2
-        col_j  = sk["hl_teks"] if idx == 0 else sk["sub"]
-        _draw_text_shadow(draw, 28, y_j, baris_text, font_j, col_j, stroke=2)
-        y_j += (50 if idx == 0 else 44)
+    draw.rectangle([0,0,W-1,H-1], outline=sk["aksen"], width=5)
+    img.save(output_path, "JPEG", quality=95)
+    log(f"  -> ✅ Thumbnail T1 saved: {output_path}")
+    return output_path
 
-    # ════════ LAYER 8: Panel kanan — Statistik historis ════════
-    px     = W // 2 + 40
-    py     = 30
-    pw     = W - px - 20
-    ph     = H - 60
 
-    # Panel kanan background semi-transparan
-    panel_r = Image.new('RGBA', (W, H), (0,0,0,0))
-    pd      = ImageDraw.Draw(panel_r)
-    _draw_rounded_rect(pd, px-20, py, px+pw+20, py+ph, 20, (0,0,0,150))
-    img     = Image.alpha_composite(img.convert('RGBA'), panel_r).convert('RGB')
-    draw    = ImageDraw.Draw(img)
+# ══════════════════════════════════════════════════
+# TEMPLATE 2 — Center Split Diagonal (Update Emas Harian)
+# Layout: Diagonal slash, kiri=harga, kanan=grafik mini
+# Warna: Biru-Perak, clean modern
+# ══════════════════════════════════════════════════
+def _thumb_template_center_split(info, judul, output_path):
+    from PIL import Image, ImageDraw, ImageFont, ImageFilter
+    W, H   = 1280, 720
+    sk     = SKEMA_AKTIF.get(info['status'], SKEMA_AKTIF['Stabil'])
+    img    = _buat_bg_foto_blur(W, H, kanan_saja=False, brightness=0.2)
+    draw   = ImageDraw.Draw(img)
 
-    # Judul panel
-    f_panel_title = get_font(28)
-    f_panel_item  = get_font(26)
-    f_panel_pct   = get_font(28)
+    # Overlay full gelap dengan tint warna channel
+    r,g,b  = sk["bg_grad_atas"] if "bg_grad_atas" in sk else (0,20,60)
+    overlay= Image.new('RGBA', (W,H), (r,g,b,200))
+    img    = Image.alpha_composite(img.convert('RGBA'), overlay).convert('RGB')
+    draw   = ImageDraw.Draw(img)
 
-    draw.text((px, py+10), "📊 Perubahan Harga", font=f_panel_title, fill=sk["aksen"])
+    fp  = _font_path()
+    h   = info['harga_sekarang']
+    st  = info['status']
+    rp  = lambda x: f"Rp {x:,}".replace(",",".")
 
-    # Garis bawah judul panel
-    draw.line([(px, py+46), (px+pw, py+46)], fill=sk["aksen"], width=2)
+    # ── Diagonal slash putih/aksen ──
+    slash_pts = [(W//2-60, 0), (W//2+60, 0), (W//2-20, H), (W//2-140, H)]
+    draw.polygon(slash_pts, fill=sk["aksen"])
 
-    historis  = info.get("historis",{})
-    label_map = [
-        ("kemarin",  "Kemarin",  "1H"),
-        ("7_hari",   "7 Hari",   "7H"),
-        ("1_bulan",  "1 Bulan",  "1B"),
-        ("3_bulan",  "3 Bulan",  "3B"),
-        ("6_bulan",  "6 Bulan",  "6B"),
-        ("1_tahun",  "1 Tahun",  "1T"),
-    ]
+    # ── Sisi KIRI: Harga ──
+    # Header channel
+    draw.text((30, 28), NAMA_CHANNEL.upper(),
+              font=_get_font(fp, 24), fill=sk["aksen"])
+    draw.line([(30, 60), (W//2-80, 60)], fill=sk["aksen"], width=2)
 
-    y_item = py + 60
-    for lb, nama_panjang, nama_pendek in label_map:
+    # Badge
+    bw, bh = 220, 56
+    _draw_rounded_rect_solid(draw, 30, 75, 30+bw, 75+bh, 14, sk["badge"])
+    draw.text((50, 86), sk["icon"], font=_get_font(fp, 28), fill=(255,255,255))
+
+    # Harga besar
+    draw.text((30, 145), "Harga Emas", font=_get_font(fp, 30), fill=(180,200,220))
+    _text_stroke(draw, 30, 180, rp(h), _get_font(fp, 88), sk["teks"], stroke=3)
+    draw.text((30, 278), "/ gram  ·  Antam", font=_get_font(fp, 26), fill=sk["sub"])
+
+    # Selisih pill
+    sel = info['selisih']
+    if sel > 0:
+        s_col = (80,255,150) if st=="Naik" else (255,110,110)
+        arah  = "▲" if st=="Naik" else "▼"
+        draw.text((30, 316), f"{arah}  {rp(sel)} dari kemarin",
+                  font=_get_font(fp, 30), fill=s_col)
+
+    # Judul bawah
+    jb = _wrap_text(re.sub(r'[^\w\s\-\.,!?%]','', judul), 26)
+    y_j = 380
+    for idx, b in enumerate(jb[:2]):
+        f_sz = 38 if idx==0 else 32
+        col  = (255,255,255) if idx==0 else (180,200,220)
+        _text_stroke(draw, 30, y_j, b, _get_font(fp, f_sz), col, 1)
+        y_j += f_sz + 10
+
+    # ── Sisi KANAN: Mini bar chart historis ──
+    cx = W//2 + 90
+    draw.text((cx, 28), "Perubahan", font=_get_font(fp, 28), fill=(200,220,255))
+    draw.text((cx, 60), "Harga Emas", font=_get_font(fp, 28), fill=sk["aksen"])
+    draw.line([(cx, 96), (W-30, 96)], fill=sk["aksen"], width=2)
+
+    historis = info.get("historis",{})
+    lbl_map  = [("kemarin","1H"),("7_hari","7H"),("1_bulan","1B"),
+                ("3_bulan","3B"),("6_bulan","6B"),("1_tahun","1T")]
+
+    bar_y = 110
+    bar_max_w = W - cx - 50
+    # Temukan max persen untuk normalisasi bar
+    pcts = [abs(historis[lb]["persen"]) for lb,_ in lbl_map if historis.get(lb)]
+    max_pct = max(pcts) if pcts else 1.0
+
+    for lb, nama in lbl_map:
         d = historis.get(lb)
-        if not d:
-            continue
+        if not d: continue
         pct   = d["persen"]
-        arah  = "▲" if d["naik"] else ("▼" if not d["stabil"] else "→")
-        warna_pct = (80,255,120) if d["naik"] else ((255,100,100) if not d["stabil"] else (180,180,180))
+        warna = (80,220,120) if d["naik"] else ((255,100,100) if not d["stabil"] else (150,150,200))
+        bar_w = int(abs(pct) / max_pct * (bar_max_w * 0.75)) + 20
 
-        # Row background alternating
-        if label_map.index((lb, nama_panjang, nama_pendek)) % 2 == 0:
-            row_overlay = Image.new('RGBA', (W, H), (0,0,0,0))
-            ro          = ImageDraw.Draw(row_overlay)
-            _draw_rounded_rect(ro, px-10, y_item-4, px+pw+10, y_item+38, 8, (255,255,255,18))
-            img  = Image.alpha_composite(img.convert('RGBA'), row_overlay).convert('RGB')
+        # Label
+        draw.text((cx, bar_y+4), nama+":", font=_get_font(fp, 22), fill=(180,200,240))
+        # Bar
+        _draw_rounded_rect_solid(draw, cx+65, bar_y+2,
+                                  cx+65+bar_w, bar_y+32, 8, warna)
+        # Persen
+        arah = "▲" if d["naik"] else ("▼" if not d["stabil"] else "→")
+        draw.text((cx+65+bar_w+8, bar_y+4),
+                  f"{arah}{abs(pct):.1f}%", font=_get_font(fp, 20), fill=warna)
+        bar_y += 46
+        if bar_y > H - 80: break
+
+    # Footer
+    draw.text((cx, H-36), datetime.now().strftime("%d %B %Y"),
+              font=_get_font(fp, 22), fill=(140,160,200))
+    draw.rectangle([0,0,W-1,H-1], outline=sk["aksen"], width=4)
+    img.save(output_path, "JPEG", quality=95)
+    log(f"  -> ✅ Thumbnail T2 saved: {output_path}")
+    return output_path
+
+
+# ══════════════════════════════════════════════════
+# TEMPLATE 3 — Dark Minimal (Info Logam Mulia)
+# Layout: Teks tengah, background sangat gelap, garis tipis
+# Warna: Hijau-Platinum, clean newspaper style
+# ══════════════════════════════════════════════════
+def _thumb_template_dark_minimal(info, judul, output_path):
+    from PIL import Image, ImageDraw, ImageFont, ImageFilter
+    W, H   = 1280, 720
+    sk     = SKEMA_AKTIF.get(info['status'], SKEMA_AKTIF['Stabil'])
+    img    = Image.new('RGB', (W, H), (8, 12, 10))
+    draw   = ImageDraw.Draw(img)
+
+    fp = _font_path()
+    h  = info['harga_sekarang']
+    st = info['status']
+    rp = lambda x: f"Rp {x:,}".replace(",",".")
+
+    # Grid garis tipis latar
+    for x in range(0, W, 80):
+        draw.line([(x,0),(x,H)], fill=(20,35,25), width=1)
+    for y in range(0, H, 80):
+        draw.line([(0,y),(W,y)], fill=(20,35,25), width=1)
+
+    # Foto blur kecil di pojok kanan bawah
+    gb = _list_gambar()
+    if gb:
+        try:
+            bg = Image.open(random.choice(gb)).convert('RGB')
+            bg = bg.resize((500, 280), Image.LANCZOS)
+            bg = bg.filter(ImageFilter.GaussianBlur(6))
+            from PIL import ImageEnhance
+            bg = ImageEnhance.Brightness(bg).enhance(0.3)
+            mask = Image.new('L', (500,280), 0)
+            md   = ImageDraw.Draw(mask)
+            # Gradient alpha dari kiri ke kanan
+            for x in range(500):
+                a = int(min(255, x * 0.5))
+                md.line([(x,0),(x,280)], fill=a)
+            img.paste(bg, (W-500, H-280), mask)
             draw = ImageDraw.Draw(img)
+        except: pass
 
-        draw.text((px+5, y_item),         nama_panjang+":", font=f_panel_item, fill=(210,210,210))
-        draw.text((px+pw-120, y_item),    f"{arah} {abs(pct):.1f}%", font=f_panel_pct, fill=warna_pct)
+    # Top bar aksen
+    draw.rectangle([0, 0, W, 6], fill=sk["aksen"])
+    draw.rectangle([0, H-6, W, H], fill=sk["aksen"])
 
-        y_item += 44
-        if y_item > py + ph - 10:
-            break
+    # Nama channel top
+    draw.text((40, 20), NAMA_CHANNEL.upper(),
+              font=_get_font(fp, 22), fill=sk["aksen"])
+    draw.text((W-240, 20), datetime.now().strftime("%d %b %Y"),
+              font=_get_font(fp, 22), fill=(100,140,110))
 
-    # ════════ LAYER 9: Footer bar ════════
-    # Gradient bar bawah
-    for y in range(H-70, H):
-        alpha = int(200 * (y - (H-70)) / 70)
-        r,g,b = sk["bg_grad_atas"] if "bg_grad_atas" in sk else (0,0,0)
-        draw.line([(0,y),(W,y)], fill=(r,g,b))
+    # Badge status
+    _draw_rounded_rect_solid(draw, 40, 65, 260, 120, 12, sk["badge"])
+    draw.text((58, 76), sk["icon"], font=_get_font(fp, 30), fill=(255,255,255))
 
-    # Nama channel & tanggal
-    f_footer = get_font(28)
-    f_tgl    = get_font(24)
-    tgl_str  = datetime.now().strftime("%d %B %Y")
+    # Harga teks besar centered-left
+    draw.text((40, 135), "HARGA EMAS ANTAM", font=_get_font(fp, 28),
+              fill=(120,180,130))
+    _text_stroke(draw, 40, 168, rp(h), _get_font(fp, 96), sk["teks"], 3)
 
-    draw.text((28, H-52), NAMA_CHANNEL, font=f_footer, fill=sk["aksen"])
-    draw.text((28, H-24), tgl_str,      font=f_tgl,    fill=(180,180,180))
+    # Garis pemisah
+    draw.line([(40, 278), (W//2+100, 278)], fill=sk["aksen"], width=3)
 
-    # ════════ LAYER 10: Border tipis aksen ════════
-    draw.rectangle([0, 0, W-1, H-1], outline=sk["aksen"], width=4)
+    # Selisih
+    sel = info['selisih']
+    s_col = (80,255,120) if st=="Naik" else ((255,100,100) if st=="Turun" else (160,160,160))
+    arah  = "▲" if st=="Naik" else ("▼" if st=="Turun" else "→")
+    if sel > 0:
+        draw.text((40, 292), f"{arah} {rp(sel)} dari kemarin",
+                  font=_get_font(fp, 32), fill=s_col)
 
-    # ════════ SIMPAN ════════
-    img.save(output_path, "JPEG", quality=95, optimize=True)
-    size_kb = os.path.getsize(output_path) // 1024
-    log(f"  -> ✅ Thumbnail saved: {output_path} ({size_kb} KB)")
+    # Judul 2 baris
+    jb = _wrap_text(re.sub(r'[^\w\s\-\.,!?%]','', judul), 30)
+    y_j = 358
+    for idx, b in enumerate(jb[:2]):
+        col = (220,255,220) if idx==0 else (140,180,150)
+        draw.text((40, y_j), b, font=_get_font(fp, 36 if idx==0 else 30), fill=col)
+        y_j += 46
+
+    # Kolom historis kanan
+    cx = W//2 + 120
+    draw.text((cx, 65), "PERUBAHAN HARGA", font=_get_font(fp, 22), fill=(100,160,110))
+    draw.line([(cx, 92), (W-40, 92)], fill=(60,100,70), width=1)
+    historis = info.get("historis",{})
+    lbl_map  = [("kemarin","1 Hari"),("7_hari","7 Hari"),("1_bulan","1 Bulan"),
+                ("3_bulan","3 Bulan"),("6_bulan","6 Bulan"),("1_tahun","1 Tahun")]
+    y_h = 100
+    for lb, nama in lbl_map:
+        d = historis.get(lb)
+        if not d: continue
+        warna = (80,230,110) if d["naik"] else ((255,110,100) if not d["stabil"] else (140,140,180))
+        arah_h= "▲" if d["naik"] else ("▼" if not d["stabil"] else "→")
+        draw.text((cx, y_h), nama, font=_get_font(fp, 24), fill=(140,170,150))
+        draw.text((cx+160, y_h), f"{arah_h} {abs(d['persen']):.1f}%",
+                  font=_get_font(fp, 24), fill=warna)
+        y_h += 42
+        if y_h > H-80: break
+
+    img.save(output_path, "JPEG", quality=95)
+    log(f"  -> ✅ Thumbnail T3 saved: {output_path}")
+    return output_path
+
+
+# ══════════════════════════════════════════════════
+# TEMPLATE 4 — Neon Energy (Harga Emas Live)
+# Layout: Full glow neon, harga center, energik
+# Warna: Ungu-Mewah, neon glow effect
+# ══════════════════════════════════════════════════
+def _thumb_template_neon_energy(info, judul, output_path):
+    from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
+    W, H   = 1280, 720
+    sk     = SKEMA_AKTIF.get(info['status'], SKEMA_AKTIF['Stabil'])
+    img    = Image.new('RGB', (W,H), (5,0,15))
+    draw   = ImageDraw.Draw(img)
+
+    # Foto blur full
+    gb = _list_gambar()
+    if gb:
+        try:
+            bg = Image.open(random.choice(gb)).convert('RGB')
+            bg = _crop_center_resize(bg, W, H)
+            bg = bg.filter(ImageFilter.GaussianBlur(12))
+            bg = ImageEnhance.Brightness(bg).enhance(0.15)
+            img.paste(bg, (0,0))
+            draw = ImageDraw.Draw(img)
+        except: pass
+
+    fp = _font_path()
+    h  = info['harga_sekarang']
+    st = info['status']
+    rp = lambda x: f"Rp {x:,}".replace(",",".")
+
+    # Radial glow center-left
+    glow = Image.new('RGBA', (W,H), (0,0,0,0))
+    gd   = ImageDraw.Draw(glow)
+    for r_size in range(350, 0, -20):
+        alpha = int(60 * (1 - r_size/350))
+        rr,gg,bb = sk["aksen"]
+        gd.ellipse([(300-r_size, H//2-r_size),
+                    (300+r_size, H//2+r_size)],
+                   fill=(rr,gg,bb,alpha))
+    img = Image.alpha_composite(img.convert('RGBA'), glow).convert('RGB')
+    draw = ImageDraw.Draw(img)
+
+    # Garis neon atas & bawah
+    for i in range(4):
+        alpha_line = 255 - i*50
+        rr,gg,bb = sk["aksen"]
+        draw.line([(0,3+i),(W,3+i)], fill=(rr,gg,bb,alpha_line))
+        draw.line([(0,H-3-i),(W,H-3-i)], fill=(rr,gg,bb,alpha_line))
+
+    # Badge animasi
+    _draw_rounded_rect_solid(draw, 30, 28, 290, 94, 18, sk["badge"])
+    _draw_rounded_rect_solid(draw, 30, 28, 290, 94, 18, None,
+                              outline=sk["aksen"], width=3)
+    draw.text((50, 40), sk["icon"], font=_get_font(fp, 34), fill=(255,255,255))
+
+    # "LIVE" badge
+    _draw_rounded_rect_solid(draw, W-120, 28, W-30, 76, 10, (200,0,0))
+    draw.text((W-110, 34), "LIVE", font=_get_font(fp, 28), fill=(255,255,255))
+    # dot merah berkedip (simulasi)
+    draw.ellipse([(W-125, 38), (W-107, 56)], fill=(255,60,60))
+
+    # Harga BESAR dengan neon glow
+    harga_str = rp(h)
+    # Glow layer
+    for offset in [(0,3),(0,-3),(3,0),(-3,0),(2,2),(-2,2)]:
+        rr,gg,bb = sk["aksen"]
+        draw.text((28+offset[0], 115+offset[1]), harga_str,
+                  font=_get_font(fp, 92), fill=(rr,gg,bb,80))
+    _text_stroke(draw, 28, 115, harga_str, _get_font(fp, 92), sk["teks"], 3)
+    draw.text((30, 218), "/ gram  ·  Antam Logam Mulia",
+              font=_get_font(fp, 28), fill=sk["sub"])
+
+    # Selisih
+    sel = info['selisih']
+    if sel > 0:
+        s_col = (80,255,130) if st=="Naik" else (255,100,100)
+        arah  = "▲" if st=="Naik" else "▼"
+        _draw_rounded_rect_solid(draw, 28, 258, 360, 308, 22,
+                                  (s_col[0]//5, s_col[1]//5, s_col[2]//5))
+        draw.text((48, 264), f"{arah} {rp(sel)}",
+                  font=_get_font(fp, 32), fill=s_col)
+
+    # Judul
+    jb = _wrap_text(re.sub(r'[^\w\s\-\.,!?%!]','', judul), 24)
+    _text_stroke(draw, 28, 330, jb[0] if jb else "", _get_font(fp, 44), (255,255,255), 2)
+    if len(jb)>1:
+        draw.text((28, 382), jb[1], font=_get_font(fp, 36), fill=sk["sub"])
+
+    # Kanan: historis vertical cards
+    cx   = W//2 + 80
+    historis = info.get("historis",{})
+    lbl_map  = [("kemarin","1H"),("7_hari","7H"),("1_bulan","1B"),
+                ("3_bulan","3B"),("6_bulan","6B"),("1_tahun","1T")]
+    cx_card = cx
+    for lb, nama in lbl_map:
+        d = historis.get(lb)
+        if not d: continue
+        if cx_card + 100 > W-10: break
+        warna = (80,255,120) if d["naik"] else ((255,100,100) if not d["stabil"] else (160,160,200))
+        arah_h= "▲" if d["naik"] else ("▼" if not d["stabil"] else "→")
+        # Card mini
+        _draw_rounded_rect_solid(draw, cx_card, H//2-80,
+                                  cx_card+90, H//2+80, 12, (0,0,0,160))
+        _draw_rounded_rect_solid(draw, cx_card, H//2-80,
+                                  cx_card+90, H//2+80, 12, None,
+                                  outline=warna, width=2)
+        draw.text((cx_card+8, H//2-68), nama,
+                  font=_get_font(fp, 22), fill=(200,200,220))
+        draw.text((cx_card+8, H//2-36), arah_h,
+                  font=_get_font(fp, 34), fill=warna)
+        draw.text((cx_card+8, H//2+4), f"{abs(d['persen']):.1f}%",
+                  font=_get_font(fp, 26), fill=warna)
+        cx_card += 100
+
+    draw.text((30, H-40), NAMA_CHANNEL, font=_get_font(fp, 24), fill=sk["aksen"])
+    draw.text((W-220, H-40), datetime.now().strftime("%d %b %Y"),
+              font=_get_font(fp, 22), fill=(160,130,200))
+    img.save(output_path, "JPEG", quality=95)
+    log(f"  -> ✅ Thumbnail T4 saved: {output_path}")
+    return output_path
+
+
+# ══════════════════════════════════════════════════
+# TEMPLATE 5 — Warm Card / Magazine (Cek Harga Emas)
+# Layout: Gaya majalah, harga di kotak card, akrab
+# Warna: Oranye-Tembaga, hangat dan familiar
+# ══════════════════════════════════════════════════
+def _thumb_template_warm_card(info, judul, output_path):
+    from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
+    W, H   = 1280, 720
+    sk     = SKEMA_AKTIF.get(info['status'], SKEMA_AKTIF['Stabil'])
+    fp     = _font_path()
+    h      = info['harga_sekarang']
+    st     = info['status']
+    rp     = lambda x: f"Rp {x:,}".replace(",",".")
+
+    # Foto full sebagai background
+    img = _buat_bg_foto_blur(W, H, kanan_saja=False, brightness=0.25)
+    # Warm tint overlay
+    warm = Image.new('RGBA', (W,H), (60,30,0,160))
+    img  = Image.alpha_composite(img.convert('RGBA'), warm).convert('RGB')
+    draw = ImageDraw.Draw(img)
+
+    # CARD utama (kiri) — kotak solid
+    card_x, card_y = 30, 30
+    card_w, card_h = W//2+30, H-60
+    _draw_rounded_rect_solid(draw, card_x, card_y,
+                              card_x+card_w, card_y+card_h, 24,
+                              (0,0,0,200))
+    _draw_rounded_rect_solid(draw, card_x, card_y,
+                              card_x+card_w, card_y+card_h, 24,
+                              None, outline=sk["aksen"], width=4)
+
+    # Header card
+    draw.text((card_x+20, card_y+16), "💛 " + NAMA_CHANNEL.upper(),
+              font=_get_font(fp, 22), fill=sk["aksen"])
+    draw.line([(card_x+20, card_y+46),
+               (card_x+card_w-20, card_y+46)],
+              fill=sk["aksen"], width=2)
+
+    # Badge
+    bx = card_x+20
+    _draw_rounded_rect_solid(draw, bx, card_y+56, bx+230, card_y+112, 14, sk["badge"])
+    draw.text((bx+16, card_y+66), sk["icon"],
+              font=_get_font(fp, 30), fill=(255,255,255))
+
+    # Harga besar
+    draw.text((bx, card_y+124), "Harga / gram",
+              font=_get_font(fp, 26), fill=(200,180,140))
+    _text_stroke(draw, bx, card_y+152, rp(h),
+                 _get_font(fp, 84), sk["teks"], 3)
+
+    # Selisih
+    sel = info['selisih']
+    if sel > 0:
+        s_col = (80,255,120) if st=="Naik" else (255,110,100)
+        arah  = "▲" if st=="Naik" else "▼"
+        draw.text((bx, card_y+250),
+                  f"{arah} {rp(sel)} dari kemarin",
+                  font=_get_font(fp, 28), fill=s_col)
+
+    # Garis divider
+    draw.line([(bx, card_y+298), (card_x+card_w-20, card_y+298)],
+              fill=(80,60,30), width=2)
+
+    # Judul bawah dalam card
+    jb = _wrap_text(re.sub(r'[^\w\s\-\.,!?%]','', judul), 26)
+    y_j = card_y + 314
+    for idx, b in enumerate(jb[:3]):
+        col = (255,240,200) if idx==0 else (200,180,140)
+        draw.text((bx, y_j), b,
+                  font=_get_font(fp, 34 if idx==0 else 28), fill=col)
+        y_j += (44 if idx==0 else 36)
+
+    # Tanggal di footer card
+    draw.text((bx, card_y+card_h-46),
+              "📅 " + datetime.now().strftime("%d %B %Y"),
+              font=_get_font(fp, 22), fill=(160,140,100))
+
+    # PANEL KANAN: historis dengan style magazine
+    rx = W//2 + 80
+    draw.text((rx, 38), "PERUBAHAN", font=_get_font(fp, 26), fill=sk["aksen"])
+    draw.text((rx, 66), "HARGA EMAS", font=_get_font(fp, 26), fill=(220,200,160))
+    draw.line([(rx, 96), (W-30, 96)], fill=sk["aksen"], width=3)
+
+    historis = info.get("historis",{})
+    lbl_map  = [("kemarin","Kemarin"),("7_hari","7 Hari"),("1_bulan","1 Bulan"),
+                ("3_bulan","3 Bulan"),("6_bulan","6 Bulan"),("1_tahun","1 Tahun")]
+    y_h = 108
+    for lb, nama in lbl_map:
+        d = historis.get(lb)
+        if not d: continue
+        warna = (80,255,120) if d["naik"] else ((255,120,100) if not d["stabil"] else (180,180,160))
+        arah_h= "▲" if d["naik"] else ("▼" if not d["stabil"] else "→")
+        draw.text((rx, y_h), nama+":", font=_get_font(fp, 26), fill=(210,190,150))
+        draw.text((rx+170, y_h), f"{arah_h} {abs(d['persen']):.1f}%",
+                  font=_get_font(fp, 28), fill=warna)
+        draw.line([(rx, y_h+38), (W-30, y_h+38)],
+                  fill=(60,45,20), width=1)
+        y_h += 46
+        if y_h > H-60: break
+
+    img.save(output_path, "JPEG", quality=95)
+    log(f"  -> ✅ Thumbnail T5 saved: {output_path}")
     return output_path
 
 
 # ════════════════════════════════════════════════════════════
-# HELPER FUNCTIONS untuk thumbnail
+# SHARED HELPERS thumbnail
 # ════════════════════════════════════════════════════════════
 
-def _buat_gradient(w, h, sk):
-    """Buat gambar gradient sebagai fallback background."""
-    img  = Image.new('RGB', (w, h))
-    draw = ImageDraw.Draw(img)
-    c1   = sk.get("bg_grad_atas",   (30, 10, 0))
-    c2   = sk.get("bg_grad_bawah",  (5, 0, 0))
-    # Diagonal gradient
-    for y in range(h):
-        for x in range(0, w, 4):
-            t  = (x/w * 0.4 + y/h * 0.6)
-            r  = int(c1[0] + (c2[0]-c1[0]) * t)
-            g  = int(c1[1] + (c2[1]-c1[1]) * t)
-            b  = int(c1[2] + (c2[2]-c1[2]) * t)
-            draw.line([(x, y),(x+4, y)], fill=(r,g,b))
-    return img
+def _font_path():
+    lokal = os.path.abspath("font_temp.ttf")
+    if os.path.exists(lokal): return lokal
+    for fp in [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf",
+    ]:
+        if os.path.exists(fp): return fp
+    return None
 
+def _get_font(fp, size):
+    from PIL import ImageFont
+    if fp:
+        try: return ImageFont.truetype(fp, size)
+        except: pass
+    return ImageFont.load_default()
 
-def _draw_rounded_rect(draw_or_img, x1, y1, x2, y2, radius, color):
-    """Gambar rectangle dengan sudut rounded, support RGBA."""
-    try:
-        if hasattr(draw_or_img, 'rounded_rectangle'):
-            draw_or_img.rounded_rectangle([x1, y1, x2, y2], radius=radius, fill=color)
-        else:
-            # Fallback manual
-            draw_or_img.rectangle([x1+radius, y1, x2-radius, y2], fill=color)
-            draw_or_img.rectangle([x1, y1+radius, x2, y2-radius], fill=color)
-            draw_or_img.ellipse([x1, y1, x1+radius*2, y1+radius*2], fill=color)
-            draw_or_img.ellipse([x2-radius*2, y1, x2, y1+radius*2], fill=color)
-            draw_or_img.ellipse([x1, y2-radius*2, x1+radius*2, y2], fill=color)
-            draw_or_img.ellipse([x2-radius*2, y2-radius*2, x2, y2], fill=color)
-    except Exception as e:
-        draw_or_img.rectangle([x1, y1, x2, y2], fill=color)
-
-
-def _draw_rounded_rect_outline(draw, x1, y1, x2, y2, radius, color, width=2):
-    """Gambar outline rounded rectangle."""
-    try:
-        if hasattr(draw, 'rounded_rectangle'):
-            draw.rounded_rectangle([x1, y1, x2, y2], radius=radius,
-                                   outline=color, width=width)
-    except:
-        draw.rectangle([x1, y1, x2, y2], outline=color, width=width)
-
-
-def _draw_text_shadow(draw, x, y, text, font, color,
-                      stroke=0, stroke_color=(0,0,0),
-                      shadow_offset=(3,3), shadow_color=(0,0,0,180)):
-    """Gambar teks dengan shadow dan optional stroke."""
-    # Shadow
-    sx, sy = shadow_offset
-    draw.text((x+sx, y+sy), text, font=font, fill=(0,0,0))
-    # Stroke
-    if stroke > 0:
-        for dx in range(-stroke, stroke+1):
-            for dy in range(-stroke, stroke+1):
-                if dx != 0 or dy != 0:
-                    draw.text((x+dx, y+dy), text, font=font, fill=stroke_color)
-    # Teks utama
+def _text_stroke(draw, x, y, text, font, color, stroke=2, stroke_col=(0,0,0)):
+    for dx in range(-stroke, stroke+1):
+        for dy in range(-stroke, stroke+1):
+            if dx or dy:
+                draw.text((x+dx, y+dy), text, font=font, fill=stroke_col)
     draw.text((x, y), text, font=font, fill=color)
 
+def _draw_rounded_rect_solid(draw, x1, y1, x2, y2, radius, fill=None, outline=None, width=2):
+    try:
+        if fill:
+            draw.rounded_rectangle([x1,y1,x2,y2], radius=radius, fill=fill)
+        if outline:
+            draw.rounded_rectangle([x1,y1,x2,y2], radius=radius,
+                                    outline=outline, width=width)
+    except:
+        if fill:
+            draw.rectangle([x1,y1,x2,y2], fill=fill)
+        if outline:
+            draw.rectangle([x1,y1,x2,y2], outline=outline, width=width)
 
-def _wrap_text(text, max_chars_per_line=26):
-    """Bungkus teks ke beberapa baris."""
-    words  = text.split()
-    baris  = []
-    current= ""
-    for word in words:
-        test = (current + " " + word).strip()
-        if len(test) <= max_chars_per_line:
-            current = test
+def _buat_bg_foto_blur(W, H, kanan_saja=False, brightness=0.25):
+    from PIL import Image, ImageFilter, ImageEnhance
+    gb = _list_gambar()
+    if gb:
+        try:
+            bg = Image.open(random.choice(gb)).convert('RGB')
+            bg = _crop_center_resize(bg, W, H)
+            bg = bg.filter(ImageFilter.GaussianBlur(10))
+            bg = ImageEnhance.Brightness(bg).enhance(brightness)
+            if kanan_saja:
+                # Hanya tampilkan foto di sisi kanan
+                solid  = Image.new('RGB', (W, H), (8,5,0))
+                mask   = Image.new('L', (W, H), 0)
+                md     = ImageDraw.Draw(mask)
+                for x in range(W):
+                    a = max(0, int((x - W//2) / (W//2) * 255))
+                    md.line([(x,0),(x,H)], fill=a)
+                solid.paste(bg, (0,0), mask)
+                return solid
+            return bg
+        except: pass
+    return Image.new('RGB', (W, H), (10,8,5))
+
+def _crop_center_resize(img, W, H):
+    from PIL import Image
+    ratio_src = img.width / img.height
+    ratio_tgt = W / H
+    if ratio_src > ratio_tgt:
+        new_w = int(img.height * ratio_tgt)
+        left  = (img.width - new_w) // 2
+        img   = img.crop((left, 0, left+new_w, img.height))
+    else:
+        new_h = int(img.width / ratio_tgt)
+        top   = (img.height - new_h) // 2
+        img   = img.crop((0, top, img.width, top+new_h))
+    return img.resize((W, H), Image.LANCZOS)
+
+def _draw_historis_panel(draw, img_ref, info, fp, sk, px, py, pw, ph):
+    historis = info.get("historis",{})
+    lbl_map  = [("kemarin","Kemarin"),("7_hari","7 Hari"),("1_bulan","1 Bulan"),
+                ("3_bulan","3 Bulan"),("6_bulan","6 Bulan"),("1_tahun","1 Tahun")]
+    draw.text((px, py+10), "Perubahan Harga",
+              font=_get_font(fp, 28), fill=sk["aksen"])
+    draw.line([(px, py+46), (px+pw, py+46)], fill=sk["aksen"], width=2)
+    y_item = py + 58
+    for lb, nama in lbl_map:
+        d = historis.get(lb)
+        if not d: continue
+        warna = (80,255,120) if d["naik"] else ((255,100,100) if not d["stabil"] else (180,180,180))
+        arah  = "▲" if d["naik"] else ("▼" if not d["stabil"] else "→")
+        draw.text((px, y_item), nama+":", font=_get_font(fp, 24), fill=(200,200,200))
+        draw.text((px+pw-130, y_item), f"{arah} {abs(d['persen']):.1f}%",
+                  font=_get_font(fp, 26), fill=warna)
+        y_item += 44
+        if y_item > py+ph-10: break
+
+def _wrap_text(text, max_chars=26):
+    words = text.split()
+    baris, cur = [], ""
+    for w in words:
+        test = (cur+" "+w).strip()
+        if len(test) <= max_chars:
+            cur = test
         else:
-            if current:
-                baris.append(current)
-            current = word
-    if current:
-        baris.append(current)
-    return baris[:3]  # max 3 baris
+            if cur: baris.append(cur)
+            cur = w
+    if cur: baris.append(cur)
+    return baris[:3]
+
 
 
 # ════════════════════════════════════════════════════════════
@@ -1860,5 +2184,6 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 

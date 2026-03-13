@@ -33,7 +33,7 @@ pastikan_library_terinstall()
 # ── Import dari file yang sudah ada di repo ───────────────────
 from config   import (NAMA_CHANNEL, YOUTUBE_TAGS,
                       YOUTUBE_CATEGORY, FFMPEG_LOG)
-from scrape   import scrape_dan_kalkulasi_harga
+from scrape   import ambil_harga_emas
 from narasi   import buat_narasi_dan_judul
 from store    import kelola_bank_gambar
 from render   import buat_suara, render_video
@@ -65,10 +65,18 @@ async def main():
     kelola_bank_gambar()
 
     # ── 1. Scrape harga emas ──────────────────────────────────
-    info, data_harga = scrape_dan_kalkulasi_harga()
+    info = ambil_harga_emas()
     if not info:
         log("❌ Scraping gagal. Proses dihentikan.")
         return
+
+    data_harga = (
+        f"Tanggal: {info['tanggal']}. "
+        f"Harga 1 gram: {rp(info['harga_sekarang'])}. "
+        f"Status: {info['status']} "
+        f"({info['persen']:+.2f}%). "
+        f"Selisih: {rp(info['selisih'])}."
+    )
 
     # ── 2. Buat narasi & judul ────────────────────────────────
     judul, narasi = buat_narasi_dan_judul(info, data_harga)
@@ -76,26 +84,27 @@ async def main():
     log(f" JUDUL: {judul}")
     log(f"{'='*60}\n")
 
-    # ── 3. Generate suara & render video ─────────────────────
+    # ── 3. Generate suara ─────────────────────────────────────
     try:
         durasi = await buat_suara(narasi, audio_temp)
     except Exception as e:
         log(f"❌ Gagal generate suara: {e}")
         return
 
+    # ── 4. Render video ───────────────────────────────────────
     sukses = render_video(audio_temp, video_hasil, durasi)
     if not sukses:
         log("❌ Render video gagal.")
         return
 
-    # ── 4. Buat thumbnail ─────────────────────────────────────
+    # ── 5. Buat thumbnail ─────────────────────────────────────
     try:
         buat_thumbnail(info, thumb_hasil)
     except Exception as e:
         log(f"⚠️ Thumbnail gagal (lanjut tanpa): {e}")
         thumb_hasil = None
 
-    # ── 5. Cek ukuran video ───────────────────────────────────
+    # ── 6. Cek ukuran video ───────────────────────────────────
     if not os.path.exists(video_hasil):
         log("❌ File video tidak ditemukan!")
         return
@@ -108,7 +117,7 @@ async def main():
             f"cek {FFMPEG_LOG}")
         return
 
-    # ── 6. Upload ke YouTube ──────────────────────────────────
+    # ── 7. Upload ke YouTube ──────────────────────────────────
     deskripsi = (
         f"Update harga emas Antam hari ini "
         f"{datetime.now().strftime('%d %B %Y')}.\n\n"
@@ -122,25 +131,31 @@ async def main():
     )
 
     upload_ke_youtube(
-        video_path   = video_hasil,
-        judul        = judul,
-        deskripsi    = deskripsi,
-        tags         = YOUTUBE_TAGS,
-        thumbnail    = thumb_hasil,
+        video_path=video_hasil,
+        judul=judul,
+        deskripsi=deskripsi,
+        tags=YOUTUBE_TAGS,
+        thumbnail=thumb_hasil,
     )
 
     # ── Bersihkan file temp ───────────────────────────────────
     for tmp in [audio_temp, "font_temp.ttf",
                 "concat_videos.txt"]:
         if tmp and os.path.exists(tmp):
-            try: os.remove(tmp)
-            except: pass
+            try:
+                os.remove(tmp)
+            except Exception:
+                pass
     for klip in glob.glob("temp_clips/*.mp4"):
-        try: os.remove(klip)
-        except: pass
+        try:
+            os.remove(klip)
+        except Exception:
+            pass
     if os.path.exists("temp_clips"):
-        try: os.rmdir("temp_clips")
-        except: pass
+        try:
+            os.rmdir("temp_clips")
+        except Exception:
+            pass
 
     log("\n" + "="*60)
     log(" PROSES SELESAI!")

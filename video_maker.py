@@ -53,7 +53,7 @@ async def main():
     tanggal_str = datetime.now().strftime('%Y%m%d')
     audio_temp  = "suara.mp3"
     video_hasil = f"Video_Emas_{tanggal_str}.mp4"
-    thumb_hasil = f"Thumbnail_{tanggal_str}.jpg"
+    thumb_hasil = f"thumbnail_{tanggal_str}.jpg"
 
     log(f"\n{'='*60}")
     log(f" AUTO VIDEO EMAS - {NAMA_CHANNEL}")
@@ -98,7 +98,7 @@ async def main():
 
     # ── 6. Buat thumbnail ─────────────────────────────────────
     try:
-        buat_thumbnail(info, thumb_hasil)
+        buat_thumbnail(info, judul, thumb_hasil)
     except Exception as e:
         log(f"⚠️ Thumbnail gagal (lanjut tanpa): {e}")
         thumb_hasil = None

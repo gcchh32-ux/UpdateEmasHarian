@@ -1,5 +1,5 @@
 # render.py
-import os, random, subprocess, sys, time
+import os, random, subprocess, sys, time, asyncio
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from config import (
     VIDEO_WIDTH, VIDEO_HEIGHT, FPS,
@@ -18,50 +18,31 @@ from store import list_gambar, list_video_bank
 
 def buat_suara(teks, output_audio):
     from config import VOICE, VOICE_RATE
-    import re, tempfile
-    log(f"[3/6] Generate suara...")
+    import re
+    log("[3/6] Generate suara...")
 
     teks_bersih = re.sub(
         r'\[.*?\]|\(.*?\)|\*.*?\*|'
         r'[▲▼⬛📊📈📉💰🔥💥🚨🎯⚡😲🤔💡🛒🔴🟢⚠️📅💛]',
         '', teks
     ).strip()
-
-    # Bersihkan newline berlebih, ganti dengan spasi
     teks_bersih = re.sub(r'\n+', ' ', teks_bersih)
     teks_bersih = re.sub(r'\s+', ' ', teks_bersih).strip()
     log(f"  -> Panjang teks: {len(teks_bersih)} karakter")
 
-    # Tulis ke file temp — hindari masalah argumen panjang di Linux
-    with tempfile.NamedTemporaryFile(
-        mode='w', suffix='.txt',
-        encoding='utf-8', delete=False
-    ) as tmp:
-        tmp.write(teks_bersih)
-        tmp_path = tmp.name
+    async def _generate():
+        import edge_tts
+        communicate = edge_tts.Communicate(
+            text=teks_bersih,
+            voice=VOICE,
+            rate=VOICE_RATE,
+        )
+        await communicate.save(output_audio)
 
     try:
-        cmd = [
-            sys.executable, '-m', 'edge_tts',
-            '--voice', VOICE,
-            '--rate',  VOICE_RATE,
-            '--file',  tmp_path,
-            '--write-media', output_audio,
-        ]
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=120
-        )
-    finally:
-        try:
-            os.remove(tmp_path)
-        except Exception:
-            pass
-
-    if result.returncode != 0:
-        log(f"  -> edge-tts stderr: {result.stderr[:300]}")
-        raise RuntimeError(
-            f"edge-tts gagal: {result.stderr[:200]}"
-        )
+        asyncio.run(_generate())
+    except Exception as e:
+        raise RuntimeError(f"edge-tts gagal: {e}")
 
     if not ffmpeg_is_valid(output_audio, min_size_kb=5):
         raise FileNotFoundError(
@@ -78,7 +59,6 @@ def buat_suara(teks, output_audio):
             f"Audio terlalu pendek ({durasi:.1f}s)!"
         )
     return durasi
-
 
 
 # ════════════════════════════════════════════════════════════
@@ -152,8 +132,8 @@ def _render_klip_gambar(args):
     vf, mode    = _get_ken_burns_filter(durasi_klip)
 
     if fp:
-        fe    = escape_ffmpeg_path(fp)
-        x, y  = random.choice([
+        fe     = escape_ffmpeg_path(fp)
+        x, y   = random.choice([
             ("30","30"), ("w-tw-30","30"),
             ("30","h-th-30"), ("w-tw-30","h-th-30"),
         ])
@@ -229,8 +209,8 @@ def _render_klip_video(args):
     )
 
     if fp:
-        fe    = escape_ffmpeg_path(fp)
-        x, y  = random.choice([
+        fe     = escape_ffmpeg_path(fp)
+        x, y   = random.choice([
             ("30","30"), ("w-tw-30","30"),
             ("30","h-th-30"), ("w-tw-30","h-th-30"),
         ])
@@ -291,7 +271,6 @@ def proses_semua_klip(durasi_total_detik):
     jumlah_klip = int(durasi_total_detik / 10) + 4
     log(f"  -> Target klip: {jumlah_klip}")
 
-    # Rasio 80% gambar, 20% video
     if video_list and gambar_list:
         n_video  = int(jumlah_klip * 0.2)
         n_gambar = jumlah_klip - n_video
@@ -406,8 +385,8 @@ def render_video_final(file_list, audio, output, durasi):
 
     valid = 0
     for line in entries:
-        path = (line.replace("file '","")
-                    .replace("'","").strip())
+        path = (line.replace("file '", "")
+                    .replace("'", "").strip())
         if ffmpeg_is_valid(path, min_size_kb=10):
             valid += 1
         else:

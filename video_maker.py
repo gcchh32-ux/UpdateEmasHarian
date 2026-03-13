@@ -1,137 +1,151 @@
-# video_maker.py — MAIN
-import os, glob
+# =============================================================
+# AUTO VIDEO EMAS - MAIN ORCHESTRATOR
+# =============================================================
+import os
+import sys
+import subprocess
+import glob
+import json
+import asyncio
 from datetime import datetime
-from config import (
-    NAMA_CHANNEL, CHANNEL_ID, NARASI_GAYA,
-    CFG, FFMPEG_LOG, YOUTUBE_TAGS,
-)
-from utils     import log
-from store     import (kelola_bank_gambar, kelola_bank_video,
-                       kelola_video_lama, debug_storage)
-from scraper import ambil_harga_emas
-from narasi    import buat_narasi_dan_judul
-from render    import (buat_suara, proses_semua_klip,
-                       render_video_final)
-from thumb     import buat_thumbnail
-from uploader  import upload_ke_youtube
 
-def main():
-    log("=" * 60)
-    log(f" AUTO VIDEO EMAS — {NAMA_CHANNEL}")
-    log(f" Channel ID : {CHANNEL_ID}")
-    log(f" Gaya       : {NARASI_GAYA}")
-    log(f" Waktu      : "
-        f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    log("=" * 60)
+# ── Auto-install dependencies ─────────────────────────────────
+def pastikan_library_terinstall():
+    cek = [
+        'requests', 'beautifulsoup4', 'edge-tts',
+        'google-api-python-client', 'google-auth-oauthlib',
+        'Pillow',
+    ]
+    try:
+        import requests
+        from bs4 import BeautifulSoup
+        import edge_tts
+        from googleapiclient.discovery import build
+        from PIL import Image
+    except ImportError:
+        print("Menginstal library yang dibutuhkan...")
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", *cek]
+        )
 
-    # Debug awal
-    debug_storage()
+pastikan_library_terinstall()
 
-    # ── Step 1: Siapkan bank gambar & video ──────────────
-    log("[1/6] Kelola bank media...")
+# ── Import dari file yang sudah ada di repo ───────────────────
+from config   import (NAMA_CHANNEL, YOUTUBE_TAGS,
+                      YOUTUBE_CATEGORY, FFMPEG_LOG)
+from scrape   import scrape_dan_kalkulasi_harga
+from narasi   import buat_narasi_dan_judul
+from store    import kelola_bank_gambar
+from render   import buat_suara, render_video
+from thumb    import buat_thumbnail
+from uploader import upload_ke_youtube
+from utils    import log, rp
+
+# ── MAIN ──────────────────────────────────────────────────────
+
+async def main():
+    # Reset log
+    with open(FFMPEG_LOG, 'w', encoding='utf-8') as f:
+        f.write(
+            f"Log FFmpeg - {datetime.now()}\n"
+            f"{'='*60}\n"
+        )
+
+    tanggal_str  = datetime.now().strftime('%Y%m%d')
+    audio_temp   = "suara.mp3"
+    video_hasil  = f"Video_Emas_{tanggal_str}.mp4"
+    thumb_hasil  = f"Thumbnail_{tanggal_str}.jpg"
+
+    log(f"\n{'='*60}")
+    log(f" AUTO VIDEO EMAS - {NAMA_CHANNEL}")
+    log(f" {datetime.now().strftime('%d %B %Y, %H:%M WIB')}")
+    log(f"{'='*60}\n")
+
+    # ── 0. Siapkan bank gambar ────────────────────────────────
     kelola_bank_gambar()
-    kelola_bank_video()
 
-    # ── Step 2: Scraping harga ───────────────────────────
-    # SEKARANG (salah):
+    # ── 1. Scrape harga emas ──────────────────────────────────
+    info, data_harga = scrape_dan_kalkulasi_harga()
+    if not info:
+        log("❌ Scraping gagal. Proses dihentikan.")
+        return
 
-    # GANTI JADI:
-    info = ambil_harga_emas()
-    data_harga = (
-    f"Tanggal: {info['tanggal']}. "
-    f"Harga 1 gram: Rp {info['harga_sekarang']:,}. "
-    f"Status: {info['status']} "
-    f"({info['persen']:+.2f}%). "
-    f"Selisih: Rp {info['selisih']:,}."
-    ).replace(",", ".")
+    # ── 2. Buat narasi & judul ────────────────────────────────
+    judul, narasi = buat_narasi_dan_judul(info, data_harga)
+    log(f"\n{'='*60}")
+    log(f" JUDUL: {judul}")
+    log(f"{'='*60}\n")
 
-
-    # ── Step 3: Buat narasi & judul ──────────────────────
-    judul, narasi = buat_narasi_dan_judul(info)
-
-    # ── Nama file output ─────────────────────────────────
-    ts         = datetime.now().strftime("%Y%m%d_%H%M")
-    audio_file = f"audio_{ts}.mp3"
-    video_file = f"Video_Emas_{ts}.mp4"
-    thumb_file = f"thumbnail_{ts}.jpg"
-
-    # ── Step 4: Generate suara ───────────────────────────
+    # ── 3. Generate suara & render video ─────────────────────
     try:
-        durasi_audio = buat_suara(narasi, audio_file)
+        durasi = await buat_suara(narasi, audio_temp)
     except Exception as e:
-        log(f"  -> ERROR buat suara: {e}")
+        log(f"❌ Gagal generate suara: {e}")
         return
 
-    # ── Step 5: Render klip visual ───────────────────────
-    file_list = proses_semua_klip(durasi_audio)
-    if not file_list:
-        log("  -> FATAL: Tidak ada klip visual!")
-        _cleanup(audio_file)
+    sukses = render_video(audio_temp, video_hasil, durasi)
+    if not sukses:
+        log("❌ Render video gagal.")
         return
 
-    # ── Step 6: Render video final ───────────────────────
-    ok = render_video_final(
-        file_list, audio_file,
-        video_file, durasi_audio,
-    )
-    if not ok:
-        log("  -> FATAL: Render video final gagal!")
-        _cleanup(audio_file, file_list)
-        return
-
-    # ── Step 7: Buat thumbnail ───────────────────────────
+    # ── 4. Buat thumbnail ─────────────────────────────────────
     try:
-        buat_thumbnail(info, judul, thumb_file)
+        buat_thumbnail(info, thumb_hasil)
     except Exception as e:
-        log(f"  -> WARNING thumbnail error: {e}")
-        thumb_file = None
+        log(f"⚠️ Thumbnail gagal (lanjut tanpa): {e}")
+        thumb_hasil = None
 
-    # ── Step 8: Upload YouTube ───────────────────────────
-    video_id = upload_ke_youtube(
-        video_path=video_file,
-        judul=judul,
-        narasi=narasi,
-        tags=YOUTUBE_TAGS,
-        info=info,
-        thumbnail_path=thumb_file,
+    # ── 5. Cek ukuran video ───────────────────────────────────
+    if not os.path.exists(video_hasil):
+        log("❌ File video tidak ditemukan!")
+        return
+
+    ukuran_mb = os.path.getsize(video_hasil) // 1024 // 1024
+    log(f"✅ VIDEO SELESAI: {video_hasil} ({ukuran_mb} MB)")
+
+    if ukuran_mb < 5:
+        log(f"⚠️ Video terlalu kecil ({ukuran_mb} MB), "
+            f"cek {FFMPEG_LOG}")
+        return
+
+    # ── 6. Upload ke YouTube ──────────────────────────────────
+    deskripsi = (
+        f"Update harga emas Antam hari ini "
+        f"{datetime.now().strftime('%d %B %Y')}.\n\n"
+        f"✅ Harga 1 gram : {rp(info['harga_sekarang'])}\n"
+        f"📊 Status       : {info['status']}\n\n"
+        f"Informasi diambil langsung dari situs resmi "
+        f"Logam Mulia.\n\n"
+        f"#HargaEmas #EmasAntam #InvestasiEmas "
+        f"#LogamMulia #EmasHariIni\n\n"
+        f"Jangan lupa SUBSCRIBE dan aktifkan notifikasi!"
     )
 
-    # ── Step 9: Cleanup ──────────────────────────────────
-    _cleanup(audio_file, file_list)
-    kelola_video_lama()
+    upload_ke_youtube(
+        video_path   = video_hasil,
+        judul        = judul,
+        deskripsi    = deskripsi,
+        tags         = YOUTUBE_TAGS,
+        thumbnail    = thumb_hasil,
+    )
 
-    # ── Ringkasan ────────────────────────────────────────
-    log("=" * 60)
-    log(f"  Video    : {video_file} "
-        f"({os.path.getsize(video_file)//1024//1024} MB)"
-        if os.path.exists(video_file) else
-        f"  Video    : TIDAK ADA")
-    log(f"  Thumbnail: "
-        f"{thumb_file if thumb_file else 'GAGAL'}")
-    log(f"  YouTube  : "
-        f"{'https://youtu.be/'+video_id if video_id else 'GAGAL'}")
-    log("=" * 60)
-
-def _cleanup(audio_file=None, file_list=None):
-    import shutil
-    if audio_file and os.path.exists(audio_file):
-        try:
-            os.remove(audio_file)
-            log(f"  -> Hapus audio temp: {audio_file}")
-        except:
-            pass
+    # ── Bersihkan file temp ───────────────────────────────────
+    for tmp in [audio_temp, "font_temp.ttf",
+                "concat_videos.txt"]:
+        if tmp and os.path.exists(tmp):
+            try: os.remove(tmp)
+            except: pass
+    for klip in glob.glob("temp_clips/*.mp4"):
+        try: os.remove(klip)
+        except: pass
     if os.path.exists("temp_clips"):
-        try:
-            shutil.rmtree("temp_clips")
-            log("  -> Hapus temp_clips/")
-        except:
-            pass
-    if file_list and os.path.exists(file_list):
-        try:
-            os.remove(file_list)
-        except:
-            pass
+        try: os.rmdir("temp_clips")
+        except: pass
+
+    log("\n" + "="*60)
+    log(" PROSES SELESAI!")
+    log("="*60)
+
 
 if __name__ == "__main__":
-    main()
-
+    asyncio.run(main())

@@ -1,177 +1,140 @@
-# utils.py — Helper functions bersama
-import os, re, shutil, subprocess
-from datetime import datetime
-
-# ── Import config ──────────────────────────────────────────
-from config import (NAMA_CHANNEL, VIDEO_WIDTH, VIDEO_HEIGHT,
-                    FPS, FFMPEG_LOG)
-
-# ════════════════════════════════════════════════════════════
-# LOG
-# ════════════════════════════════════════════════════════════
+# utils.py
+import os, subprocess
+from config import FFMPEG_LOG, VIDEO_WIDTH, VIDEO_HEIGHT
 
 def log(msg):
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
-
-# ════════════════════════════════════════════════════════════
-# FONT
-# ════════════════════════════════════════════════════════════
+    from datetime import datetime
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}",
+          flush=True)
 
 def font_path():
-    lokal = os.path.abspath("font_temp.ttf")
-    if os.path.exists(lokal):
-        return lokal
     candidates = [
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+        "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
         "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf",
-        "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf",
-        "C:/Windows/Fonts/arialbd.ttf",
-        "C:/Windows/Fonts/arial.ttf",
     ]
-    for path in candidates:
-        if os.path.exists(path):
-            try:
-                shutil.copy(path, lokal)
-                log(f"  -> Font disalin dari: {path}")
-                return lokal
-            except:
-                continue
-    log("  -> WARNING: Tidak ada font ditemukan, watermark dinonaktifkan.")
-    return None
+    for c in candidates:
+        if os.path.exists(c):
+            return c
+    result = subprocess.run(
+        ["fc-list", ":style=Bold", "--format=%{file}\n"],
+        capture_output=True, text=True
+    )
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if line and os.path.exists(line):
+            return line
+    return ""
 
-def get_font(fp, size):
+def escape_ffmpeg_path(path):
+    if not path:
+        return ""
+    return path.replace("\\", "/").replace(":", "\\:")
+
+def get_font(fp, size=32):
     from PIL import ImageFont
-    if fp:
+    if fp and os.path.exists(fp):
         try:
             return ImageFont.truetype(fp, size)
         except:
             pass
     return ImageFont.load_default()
 
-# ════════════════════════════════════════════════════════════
-# TEXT HELPERS
-# ════════════════════════════════════════════════════════════
-
-def wrap_text(text, max_chars=26):
-    """Bungkus teks ke beberapa baris berdasarkan max karakter."""
-    text  = re.sub(r'[▲▼⬛🔥💥🚨🎯💰📊📈📉⚡😲🤔💡🛒🔴🟢⚠️📅💛]', '', text).strip()
-    words = text.split()
-    baris, cur = [], ""
+def wrap_text(text, max_chars=30):
+    words  = text.split()
+    lines  = []
+    line   = ""
     for w in words:
-        test = (cur + " " + w).strip()
-        if len(test) <= max_chars:
-            cur = test
+        if len(line) + len(w) + 1 <= max_chars:
+            line = (line + " " + w).strip()
         else:
-            if cur:
-                baris.append(cur)
-            cur = w
-    if cur:
-        baris.append(cur)
-    return baris[:3]
+            if line:
+                lines.append(line)
+            line = w
+    if line:
+        lines.append(line)
+    return lines
 
-def bersihkan_teks_tts(teks):
-    """Bersihkan teks untuk TTS — hapus simbol/markdown."""
-    teks = re.sub(r'\[.*?\]|\(.*?\)|\*.*?\*', '', teks)
-    teks = re.sub(r'[▲▼⬛📊📈📉💰🔥💥🚨🎯⚡😲🤔💡🛒🔴🟢⚠️📅💛]', '', teks)
-    return teks.strip()
-
-def rp(angka):
-    """Format angka ke Rupiah: Rp 1.234.567"""
-    return f"Rp {angka:,}".replace(",", ".")
-
-# ════════════════════════════════════════════════════════════
-# FFMPEG HELPERS
-# ════════════════════════════════════════════════════════════
-
-def escape_ffmpeg_path(path):
-    """Escape path untuk dipakai di FFmpeg filter."""
-    return path.replace('\\', '/').replace(':', '\\:')
-
-def ffmpeg_duration(file_path):
-    """Ambil durasi file audio/video via ffprobe."""
-    try:
-        result = subprocess.run(
-            ['ffprobe', '-v', 'error',
-             '-show_entries', 'format=duration',
-             '-of', 'default=noprint_wrappers=1:nokey=1',
-             file_path],
-            capture_output=True, text=True, timeout=15
+def draw_rounded_rect(draw, x1, y1, x2, y2, radius,
+                       fill=None, outline=None, width=1):
+    from PIL import ImageDraw
+    if fill:
+        draw.rounded_rectangle(
+            [x1, y1, x2, y2], radius=radius,
+            fill=fill, outline=outline, width=width
         )
+    else:
+        draw.rounded_rectangle(
+            [x1, y1, x2, y2], radius=radius,
+            outline=outline, width=width
+        )
+
+def draw_text_stroke(draw, x, y, text, font,
+                      fill, stroke=2,
+                      stroke_fill=(0, 0, 0)):
+    for dx in range(-stroke, stroke+1):
+        for dy in range(-stroke, stroke+1):
+            if dx == 0 and dy == 0:
+                continue
+            draw.text((x+dx, y+dy), text,
+                      font=font, fill=stroke_fill)
+    draw.text((x, y), text, font=font, fill=fill)
+
+def crop_center_resize(img, w, h):
+    from PIL import Image
+    iw, ih   = img.size
+    ar_target = w / h
+    ar_img    = iw / ih
+    if ar_img > ar_target:
+        new_w = int(ih * ar_target)
+        left  = (iw - new_w) // 2
+        img   = img.crop((left, 0, left+new_w, ih))
+    else:
+        new_h = int(iw / ar_target)
+        top   = (ih - new_h) // 2
+        img   = img.crop((0, top, iw, top+new_h))
+    return img.resize((w, h), Image.LANCZOS)
+
+def ffmpeg_duration(path):
+    result = subprocess.run(
+        [
+            "ffprobe", "-v", "error",
+            "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            path,
+        ],
+        capture_output=True, text=True,
+    )
+    try:
         return float(result.stdout.strip())
     except:
         return 0.0
 
-def ffmpeg_is_valid(file_path, min_size_kb=10):
-    """Cek apakah file video/audio valid dan tidak kosong."""
-    if not os.path.exists(file_path):
+def ffmpeg_is_valid(path, min_size_kb=10):
+    if not path or not os.path.exists(path):
         return False
-    if os.path.getsize(file_path) < min_size_kb * 1024:
+    if os.path.getsize(path) < min_size_kb * 1024:
         return False
-    return True
+    result = subprocess.run(
+        [
+            "ffprobe", "-v", "error",
+            "-select_streams", "v:0",
+            "-show_entries", "stream=codec_type",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            path,
+        ],
+        capture_output=True, text=True,
+    )
+    return result.returncode == 0
 
-def log_ffmpeg_tail(n=25):
-    """Print N baris terakhir ffmpeg_log.txt untuk debug."""
-    try:
-        with open(FFMPEG_LOG, 'r', encoding='utf-8') as f:
-            lines = f.readlines()
-        log(f"  -> {n} baris terakhir {FFMPEG_LOG}:")
-        for line in lines[-n:]:
-            print(f"     {line.rstrip()}", flush=True)
-    except:
-        log(f"  -> Tidak bisa baca {FFMPEG_LOG}")
-
-# ════════════════════════════════════════════════════════════
-# IMAGE HELPERS
-# ════════════════════════════════════════════════════════════
-
-def crop_center_resize(img, W, H):
-    """Crop tengah gambar lalu resize ke W×H tanpa distorsi."""
-    from PIL import Image
-    ratio_src = img.width / img.height
-    ratio_tgt = W / H
-    if ratio_src > ratio_tgt:
-        new_w = int(img.height * ratio_tgt)
-        left  = (img.width - new_w) // 2
-        img   = img.crop((left, 0, left + new_w, img.height))
-    else:
-        new_h = int(img.width / ratio_tgt)
-        top   = (img.height - new_h) // 2
-        img   = img.crop((0, top, img.width, top + new_h))
-    return img.resize((W, H), Image.LANCZOS)
-
-def draw_rounded_rect(draw, x1, y1, x2, y2, radius,
-                       fill=None, outline=None, width=2):
-    """Gambar rectangle sudut rounded, support fill & outline."""
-    try:
-        if fill:
-            draw.rounded_rectangle([x1, y1, x2, y2],
-                                    radius=radius, fill=fill)
-        if outline:
-            draw.rounded_rectangle([x1, y1, x2, y2],
-                                    radius=radius,
-                                    outline=outline, width=width)
-    except:
-        # Fallback Pillow lama
-        if fill:
-            draw.rectangle([x1, y1, x2, y2], fill=fill)
-        if outline:
-            draw.rectangle([x1, y1, x2, y2],
-                            outline=outline, width=width)
-
-def draw_text_stroke(draw, x, y, text, font, color,
-                     stroke=2, stroke_col=(0, 0, 0)):
-    """Gambar teks dengan stroke + shadow."""
-    # Shadow
-    draw.text((x + 3, y + 3), text, font=font, fill=(0, 0, 0))
-    # Stroke
-    if stroke > 0:
-        for dx in range(-stroke, stroke + 1):
-            for dy in range(-stroke, stroke + 1):
-                if dx or dy:
-                    draw.text((x + dx, y + dy), text,
-                               font=font, fill=stroke_col)
-    # Teks utama
-    draw.text((x, y), text, font=font, fill=color)
+def log_ffmpeg_tail(n=20):
+    if not os.path.exists(FFMPEG_LOG):
+        log("  -> ffmpeg_log.txt tidak ditemukan")
+        return
+    with open(FFMPEG_LOG, encoding="utf-8", errors="ignore") as f:
+        lines = f.readlines()
+    log(f"  -> === FFMPEG LOG (last {n} lines) ===")
+    for line in lines[-n:]:
+        log(f"  {line.rstrip()}")

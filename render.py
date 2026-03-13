@@ -18,7 +18,7 @@ from store import list_gambar, list_video_bank
 
 def buat_suara(teks, output_audio):
     from config import VOICE, VOICE_RATE
-    import re
+    import re, asyncio, threading
     log("[3/6] Generate suara...")
 
     teks_bersih = re.sub(
@@ -39,10 +39,23 @@ def buat_suara(teks, output_audio):
         )
         await communicate.save(output_audio)
 
-    try:
-        asyncio.run(_generate())
-    except Exception as e:
-        raise RuntimeError(f"edge-tts gagal: {e}")
+    # Jalankan di thread baru agar punya event loop sendiri
+    # (menghindari "cannot be called from a running event loop")
+    error_container = []
+    def _run_in_thread():
+        try:
+            asyncio.run(_generate())
+        except Exception as e:
+            error_container.append(e)
+
+    t = threading.Thread(target=_run_in_thread)
+    t.start()
+    t.join(timeout=120)
+
+    if t.is_alive():
+        raise RuntimeError("edge-tts timeout (>120s)!")
+    if error_container:
+        raise RuntimeError(f"edge-tts gagal: {error_container[0]}")
 
     if not ffmpeg_is_valid(output_audio, min_size_kb=5):
         raise FileNotFoundError(
@@ -59,6 +72,7 @@ def buat_suara(teks, output_audio):
             f"Audio terlalu pendek ({durasi:.1f}s)!"
         )
     return durasi
+
 
 
 # ════════════════════════════════════════════════════════════

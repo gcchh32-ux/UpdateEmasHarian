@@ -8,6 +8,9 @@ from config import (
 )
 from utils import log, rp
 
+import os
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
+
 GEMINI_MODELS = [
     "gemini-2.0-flash",
     "gemini-1.5-flash",
@@ -18,6 +21,13 @@ GEMINI_BASE = (
     "https://generativelanguage.googleapis.com/v1beta/"
     "models/{model}:generateContent"
 )
+
+OPENROUTER_MODELS = [
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "google/gemini-2.0-flash-exp:free",
+    "deepseek/deepseek-r1:free",
+    "mistralai/mistral-7b-instruct:free",
+]
 
 # ════════════════════════════════════════════════════════════
 # PROMPT
@@ -116,7 +126,7 @@ ATURAN NARASI:
 - WAJIB minimal 450 kata, jangan singkat"""
 
 # ════════════════════════════════════════════════════════════
-# CALL GEMINI — retry + model fallback
+# CALL GEMINI
 # ════════════════════════════════════════════════════════════
 
 def _call_gemini(prompt):
@@ -161,7 +171,7 @@ def _call_gemini(prompt):
                 text = (data["candidates"][0]
                             ["content"]["parts"][0]
                             ["text"])
-                log(f"  -> ✅ Gemini [{model}] OK!")
+                log(f"  -> Gemini [{model}] OK!")
                 return text
             except requests.exceptions.HTTPError as e:
                 log(f"  -> HTTP error: {e}")
@@ -174,7 +184,77 @@ def _call_gemini(prompt):
         log(f"  -> [{model}] gagal, coba model lain...")
         time.sleep(5)
 
-    log("  -> Semua model Gemini gagal, pakai fallback")
+    log("  -> Semua model Gemini gagal")
+    return None
+
+# ════════════════════════════════════════════════════════════
+# CALL OPENROUTER
+# ════════════════════════════════════════════════════════════
+
+def _call_openrouter(prompt):
+    if not OPENROUTER_API_KEY:
+        log("  -> OPENROUTER_API_KEY kosong, skip")
+        return None
+
+    for model in OPENROUTER_MODELS:
+        for attempt in range(1, 3):
+            try:
+                log(f"  -> OpenRouter [{model}] "
+                    f"attempt {attempt}/2...")
+                resp = requests.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={
+                        "Authorization":
+                            f"Bearer {OPENROUTER_API_KEY}",
+                        "Content-Type": "application/json",
+                        "HTTP-Referer": "https://github.com",
+                        "X-Title": NAMA_CHANNEL,
+                    },
+                    json={
+                        "model": model,
+                        "messages": [{
+                            "role":    "user",
+                            "content": prompt,
+                        }],
+                        "max_tokens":  1500,
+                        "temperature": 0.8,
+                    },
+                    timeout=60,
+                )
+                if resp.status_code == 429:
+                    wait = attempt * 15
+                    log(f"  -> Rate limit 429, "
+                        f"tunggu {wait}s...")
+                    time.sleep(wait)
+                    continue
+                if resp.status_code in (500, 502, 503):
+                    wait = attempt * 10
+                    log(f"  -> Server error "
+                        f"{resp.status_code}, "
+                        f"tunggu {wait}s...")
+                    time.sleep(wait)
+                    continue
+                resp.raise_for_status()
+                data = resp.json()
+                text = (data["choices"][0]
+                            ["message"]["content"])
+                if text and len(text.strip()) > 100:
+                    log(f"  -> OpenRouter [{model}] OK!")
+                    return text
+                else:
+                    log(f"  -> [{model}] respon kosong")
+            except requests.exceptions.HTTPError as e:
+                log(f"  -> HTTP error: {e}")
+                if attempt < 2:
+                    time.sleep(attempt * 10)
+            except Exception as e:
+                log(f"  -> Error: {e}")
+                if attempt < 2:
+                    time.sleep(attempt * 10)
+        log(f"  -> [{model}] gagal, coba model lain...")
+        time.sleep(3)
+
+    log("  -> Semua model OpenRouter gagal")
     return None
 
 # ════════════════════════════════════════════════════════════
@@ -381,22 +461,39 @@ Sampai jumpa di video berikutnya, tetap semangat berinvestasi dan salam sukses u
 def buat_narasi_dan_judul(info):
     log("[2/6] Membuat narasi & judul...")
     prompt = _build_prompt(info)
-    raw    = _call_gemini(prompt)
 
+    # ── Coba Gemini dulu ──────────────────────────────────
+    raw = _call_gemini(prompt)
     if raw:
         judul, narasi = _parse_output(raw)
         if len(narasi.split()) >= 350:
-            log(f"  -> ✅ Gemini OK — "
+            log(f"  -> Gemini OK — "
                 f"{len(narasi.split())} kata")
             log(f"  -> Judul: {judul[:60]}...")
             return judul, narasi
         else:
-            log(f"  -> Narasi terlalu pendek "
+            log(f"  -> Narasi Gemini terlalu pendek "
                 f"({len(narasi.split())} kata), "
-                f"pakai fallback")
+                f"coba OpenRouter...")
 
+    # ── Coba OpenRouter sebagai fallback ─────────────────
+    raw = _call_openrouter(prompt)
+    if raw:
+        judul, narasi = _parse_output(raw)
+        if len(narasi.split()) >= 350:
+            log(f"  -> OpenRouter OK — "
+                f"{len(narasi.split())} kata")
+            log(f"  -> Judul: {judul[:60]}...")
+            return judul, narasi
+        else:
+            log(f"  -> Narasi OpenRouter terlalu pendek "
+                f"({len(narasi.split())} kata), "
+                f"pakai fallback lokal...")
+
+    # ── Fallback lokal jika semua API gagal ──────────────
+    log("  -> Pakai narasi fallback lokal...")
     judul, narasi = _buat_narasi_fallback(info)
-    log(f"  -> ✅ Fallback OK — "
+    log(f"  -> Fallback OK — "
         f"{len(narasi.split())} kata")
     log(f"  -> Judul: {judul[:60]}...")
     return judul, narasi

@@ -3,7 +3,7 @@ name: Auto Upload Video Emas
 
 on:
   schedule:
-    - cron: "0 1 * * *"   # Jam 07:00 WIB — sama semua repo, beda akun jadi tidak masalah
+    - cron: "30 1 * * *"   # Jam 07:00 WIB — sama semua repo, beda akun jadi tidak masalah
   workflow_dispatch:
 
 env:
@@ -81,4 +81,5 @@ jobs:
           path: "thumbnail_*.jpg"
           if-no-files-found: ignore
           retention-days: 7
+
 

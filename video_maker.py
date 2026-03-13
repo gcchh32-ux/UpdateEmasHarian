@@ -117,24 +117,13 @@ async def main():
         return
 
     # ── 8. Upload ke YouTube ──────────────────────────────────
-    deskripsi = (
-        f"Update harga emas Antam hari ini "
-        f"{datetime.now().strftime('%d %B %Y')}.\n\n"
-        f"✅ Harga 1 gram : {rp(info['harga_sekarang'])}\n"
-        f"📊 Status       : {info['status']}\n\n"
-        f"Informasi diambil langsung dari situs resmi "
-        f"Logam Mulia.\n\n"
-        f"#HargaEmas #EmasAntam #InvestasiEmas "
-        f"#LogamMulia #EmasHariIni\n\n"
-        f"Jangan lupa SUBSCRIBE dan aktifkan notifikasi!"
-    )
-
     upload_ke_youtube(
         video_path=video_hasil,
         judul=judul,
-        deskripsi=deskripsi,
+        narasi=narasi,
         tags=YOUTUBE_TAGS,
-        thumbnail=thumb_hasil,
+        info=info,
+        thumbnail_path=thumb_hasil,
     )
 
     # ── Bersihkan file temp ───────────────────────────────────

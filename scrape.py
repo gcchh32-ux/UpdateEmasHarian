@@ -156,12 +156,28 @@ def _load_history():
     try:
         with open(FILE_HISTORY, "r") as f:
             data = json.load(f)
-        # FIX: pastikan selalu dict, bukan list/tipe lain
+
+        # Bukan dict → reset
         if not isinstance(data, dict):
             log("  -> [history] Format salah, reset ke {}")
             return {}
+
+        # Format LAMA: {"harga_1_gram": 1850000, "tanggal": "2026-03-13"}
+        if "harga_1_gram" in data and "tanggal" in data:
+            old_harga   = data.get("harga_1_gram", 0)
+            old_tanggal = data.get("tanggal", "")
+            log("  -> [history] Konversi format lama → baru")
+            if old_harga and old_tanggal:
+                new_history = {old_tanggal: old_harga}
+                # Langsung simpan format baru
+                _save_history(new_history)
+                return new_history
+            return {}
+
         return data
-    except Exception:
+
+    except Exception as e:
+        log(f"  -> [history] Gagal load: {e}")
         return {}
 
 
@@ -243,7 +259,7 @@ def ambil_harga_emas():
 
     log(f"  -> ✅ Harga ditemukan: {rp(harga)}")
 
-    # Load history — dijamin dict
+    # Load history — dijamin dict & format baru
     history      = _load_history()
     hari_ini     = datetime.now().strftime("%Y-%m-%d")
     kemarin_str  = None
@@ -269,7 +285,7 @@ def ambil_harga_emas():
 
     historis = _hitung_historis(history, harga)
 
-    # Simpan history
+    # Simpan history hari ini
     history[hari_ini] = harga
     if len(history) > 400:
         keys_old = sorted(history.keys())[:len(history)-400]

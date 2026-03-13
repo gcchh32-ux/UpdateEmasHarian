@@ -1,28 +1,12 @@
-# scrape.py
-import os, json, re, time
-from datetime import datetime
+# scraper.py
+import re
+import json
+import os
 import requests
+from datetime import datetime
 from bs4 import BeautifulSoup
 from config import FILE_HISTORY
-from utils  import log
-
-SUMBER_SCRAPING = [
-    {
-        "nama": "logammulia.com",
-        "url":  "https://www.logammulia.com/id/harga-emas-hari-ini",
-        "fn":   "_scrape_logammulia",
-    },
-    {
-        "nama": "harga-emas.org",
-        "url":  "https://harga-emas.org/",
-        "fn":   "_scrape_hargaemas_org",
-    },
-    {
-        "nama": "investing.com",
-        "url":  "https://id.investing.com/commodities/gold",
-        "fn":   "_scrape_investing",
-    },
-]
+from utils import log, rp
 
 HEADERS = {
     "User-Agent": (
@@ -30,117 +14,164 @@ HEADERS = {
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/122.0.0.0 Safari/537.36"
     ),
-    "Accept-Language": "id-ID,id;q=0.9,en;q=0.8",
+    "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8",
 }
 
 # ════════════════════════════════════════════════════════════
-# SCRAPER PER SUMBER
+# SCRAPE LOGAMMULIA.COM
 # ════════════════════════════════════════════════════════════
 
-def _scrape_logammulia(url):
-    resp = requests.get(url, headers=HEADERS, timeout=15)
-    resp.raise_for_status()
-    soup = BeautifulSoup(resp.text, "lxml")
-    for tag in soup.find_all(
-            string=re.compile(r"1\s*[Gg]ram")):
-        row = tag.find_parent("tr")
-        if not row:
-            continue
-        cells = row.find_all("td")
-        for cell in cells:
-            txt   = cell.get_text(strip=True)
-            clean = re.sub(r"[^\d]", "", txt)
-            if clean and 900000 <= int(clean) <= 5000000:
-                return int(clean)
-    tds = soup.find_all("td")
-    for td in tds:
-        txt   = td.get_text(strip=True)
-        clean = re.sub(r"[^\d]", "", txt)
-        if clean and 900000 <= int(clean) <= 5000000:
-            return int(clean)
-    return None
+def _scrape_logammulia():
+    """
+    Ambil harga emas 1 gram dari logammulia.com.
+    Tabel urutan: 0.5gr, 1gr, 2gr, ...
+    Kita cari baris yang berisi '1 gr' secara eksplisit.
+    """
+    try:
+        resp = requests.get(
+            "https://www.logammulia.com/id/harga-emas-hari-ini",
+            headers=HEADERS, timeout=20,
+        )
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
 
-def _scrape_hargaemas_org(url):
-    resp = requests.get(url, headers=HEADERS, timeout=15)
-    resp.raise_for_status()
-    soup = BeautifulSoup(resp.text, "lxml")
-    for tag in soup.find_all(
-            string=re.compile(r"Antam|antam|ANTAM")):
-        parent = tag.find_parent(
-            ["tr","div","span","p","td"])
-        if not parent:
-            continue
-        txt  = parent.get_text(strip=True)
-        nums = re.findall(r"\d{3}[\d\.]+", txt)
-        for n in nums:
-            clean = re.sub(r"\.", "", n)
-            try:
-                if 900000 <= int(clean) <= 5000000:
-                    return int(clean)
-            except:
-                continue
-    patterns = [
-        r"Rp\s*([\d\.]+)",
-        r"([\d]{3}\.[\d]{3}\.[\d]{3})",
-        r"([\d]{1,3}(?:\.[\d]{3})+)",
-    ]
-    text = soup.get_text()
-    for pat in patterns:
-        matches = re.findall(pat, text)
+        # Cari semua tabel di halaman
+        tables = soup.find_all("table")
+        for table in tables:
+            rows = table.find_all("tr")
+            for row in rows:
+                cells = row.find_all(["td", "th"])
+                if not cells:
+                    continue
+                # Cari baris dengan teks "1 gr" persis
+                cell_texts = [c.get_text(strip=True)
+                              for c in cells]
+                # Kolom 0 harus "1 gr" (bukan "0.5 gr", "10 gr", dll)
+                if (len(cell_texts) >= 2 and
+                        re.match(
+                            r'^1\s*gr?$',
+                            cell_texts[0],
+                            re.IGNORECASE
+                        )):
+                    # Kolom 1 = harga dasar (tanpa pajak)
+                    raw = re.sub(r'[^\d]', '', cell_texts[1])
+                    if raw and len(raw) >= 6:
+                        harga = int(raw)
+                        log(f"  -> [logammulia] "
+                            f"1 gr = Rp {harga:,}")
+                        return harga
+
+        # Fallback: cari dengan regex langsung di HTML
+        log("  -> [logammulia] Tabel tidak ketemu, "
+            "coba regex...")
+        return _scrape_logammulia_regex(resp.text)
+
+    except Exception as e:
+        log(f"  -> [logammulia] Error: {e}")
+        return None
+
+
+def _scrape_logammulia_regex(html):
+    """
+    Fallback: cari pola '1 gr ... 3.xxx.xxx' di HTML mentah.
+    Hindari menangkap 0.5 gr atau 10 gr.
+    """
+    try:
+        # Pola: '1 gr' diikuti angka 7 digit (harga per gram)
+        # Contoh: "1 gr</td><td>3,021,000</td>"
+        pattern = (
+            r'(?<![0-9.])'   # tidak didahului angka
+            r'1\s*gr'        # tepat "1 gr"
+            r'(?!\s*\d)'     # tidak diikuti angka (bukan "10 gr")
+            r'.*?'           # isi tengah
+            r'(\d[\d.,]{5,})'# angka minimal 6 digit
+        )
+        matches = re.findall(pattern, html,
+                             re.IGNORECASE | re.DOTALL)
         for m in matches:
-            clean = re.sub(r"\.", "", m)
-            try:
-                val = int(clean)
-                if 900000 <= val <= 5000000:
-                    return val
-            except:
-                continue
-    return None
-
-def _scrape_investing(url):
-    resp = requests.get(url, headers=HEADERS, timeout=15)
-    resp.raise_for_status()
-    soup = BeautifulSoup(resp.text, "lxml")
-    text = soup.get_text()
-    nums = re.findall(
-        r"(?:Rp|IDR)?\s*([\d]{3}[\d\.]+)", text
-    )
-    for n in nums:
-        clean = re.sub(r"\.", "", n)
-        try:
-            val = int(clean)
-            if 900000 <= val <= 5000000:
-                return val
-        except:
-            continue
-    return None
-
-# ════════════════════════════════════════════════════════════
-# SCRAPE UTAMA — coba semua sumber
-# ════════════════════════════════════════════════════════════
-
-def _scrape_harga():
-    fn_map = {
-        "_scrape_logammulia":    _scrape_logammulia,
-        "_scrape_hargaemas_org": _scrape_hargaemas_org,
-        "_scrape_investing":     _scrape_investing,
-    }
-    for sumber in SUMBER_SCRAPING:
-        try:
-            log(f"  -> Scraping: {sumber['nama']}...")
-            fn    = fn_map[sumber["fn"]]
-            harga = fn(sumber["url"])
-            if harga:
-                log(f"  -> ✅ {sumber['nama']}: "
-                    f"Rp {harga:,}".replace(",","."))
+            raw   = re.sub(r'[^\d]', '', m)
+            harga = int(raw)
+            # Validasi: harga emas 1gr harusnya 2jt - 5jt
+            if 2_000_000 <= harga <= 5_000_000:
+                log(f"  -> [logammulia regex] "
+                    f"1 gr = Rp {harga:,}")
                 return harga
-            else:
-                log(f"  -> {sumber['nama']}: "
-                    f"tidak dapat harga")
-        except Exception as e:
-            log(f"  -> {sumber['nama']} error: {e}")
-        time.sleep(1)
-    return None
+        log("  -> [logammulia regex] Tidak ada "
+            "harga valid")
+        return None
+    except Exception as e:
+        log(f"  -> [logammulia regex] Error: {e}")
+        return None
+
+
+# ════════════════════════════════════════════════════════════
+# SCRAPE EMASANTAM.ID (sumber cadangan)
+# ════════════════════════════════════════════════════════════
+
+def _scrape_emasantam():
+    """Sumber cadangan: emasantam.id"""
+    try:
+        resp = requests.get(
+            "https://emasantam.id/harga-emas-antam-harian/",
+            headers=HEADERS, timeout=20,
+        )
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+
+        # Cari angka harga 1 gram (format Rp. x.xxx.xxx)
+        teks = soup.get_text()
+        pattern = r'Rp[.\s]*(\d[\d.]+)'
+        matches = re.findall(pattern, teks)
+        for m in matches:
+            raw   = re.sub(r'[^\d]', '', m)
+            harga = int(raw)
+            if 2_000_000 <= harga <= 5_000_000:
+                log(f"  -> [emasantam] "
+                    f"1 gr = Rp {harga:,}")
+                return harga
+        return None
+    except Exception as e:
+        log(f"  -> [emasantam] Error: {e}")
+        return None
+
+
+# ════════════════════════════════════════════════════════════
+# SCRAPE GOODSTATS.ID (sumber cadangan ke-2)
+# ════════════════════════════════════════════════════════════
+
+def _scrape_goodstats():
+    """Sumber cadangan ke-2: goodstats.id"""
+    try:
+        resp = requests.get(
+            "https://goodstats.id/data-trend/harga-emas/"
+            "logammulia",
+            headers=HEADERS, timeout=20,
+        )
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+        teks = soup.get_text()
+
+        # Cari baris "1 gr" lalu ambil harga
+        lines = teks.splitlines()
+        for i, line in enumerate(lines):
+            line_s = line.strip()
+            if re.match(r'^1\s*gr?$', line_s,
+                        re.IGNORECASE):
+                # Cari angka di baris berikutnya
+                for j in range(i+1, min(i+5, len(lines))):
+                    raw = re.sub(r'[^\d]', '',
+                                 lines[j].strip())
+                    if raw:
+                        harga = int(raw)
+                        if 2_000_000 <= harga <= 5_000_000:
+                            log(f"  -> [goodstats] "
+                                f"1 gr = Rp {harga:,}")
+                            return harga
+        return None
+    except Exception as e:
+        log(f"  -> [goodstats] Error: {e}")
+        return None
+
 
 # ════════════════════════════════════════════════════════════
 # HISTORY HARGA
@@ -148,140 +179,149 @@ def _scrape_harga():
 
 def _load_history():
     if not os.path.exists(FILE_HISTORY):
-        return []
+        return {}
     try:
-        with open(FILE_HISTORY, encoding="utf-8") as f:
-            data = json.load(f)
-        if not isinstance(data, list):
-            log("  -> WARNING: history bukan list, reset!")
-            return []
-        return data
+        with open(FILE_HISTORY, "r") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _save_history(history):
+    try:
+        with open(FILE_HISTORY, "w") as f:
+            json.dump(history, f, indent=2)
     except Exception as e:
-        log(f"  -> WARNING load history: {e}")
-        return []
+        log(f"  -> [history] Gagal simpan: {e}")
 
-def _simpan_history(history):
-    if not isinstance(history, list):
-        history = []
-    history = history[:400]
-    with open(FILE_HISTORY, "w", encoding="utf-8") as f:
-        json.dump(history, f, indent=2,
-                  ensure_ascii=False)
 
-def _hitung_perubahan(harga_kini, history, hari):
-    if not isinstance(history, list):
-        return None
-    target = None
-    for h in history:
-        try:
-            tgl   = datetime.strptime(
-                h["tanggal"], "%Y-%m-%d"
-            )
-            delta = (datetime.now() - tgl).days
-            if delta >= hari:
-                target = h["harga"]
-                break
-        except:
+def _hitung_historis(history, harga_sekarang):
+    """Hitung perubahan untuk berbagai periode."""
+    hari_ini = datetime.now().strftime("%Y-%m-%d")
+    result   = {}
+    peta     = {
+        "kemarin": 1,
+        "7_hari":  7,
+        "1_bulan": 30,
+        "3_bulan": 90,
+        "6_bulan": 180,
+        "1_tahun": 365,
+    }
+    tanggal_list = sorted(history.keys(), reverse=True)
+
+    for key, hari in peta.items():
+        target = None
+        for tgl in tanggal_list:
+            try:
+                d = datetime.strptime(tgl, "%Y-%m-%d")
+                t = datetime.strptime(hari_ini, "%Y-%m-%d")
+                selisih_hari = (t - d).days
+                if selisih_hari >= hari:
+                    target = history[tgl]
+                    break
+            except Exception:
+                continue
+
+        if target is None:
             continue
-    if not target:
-        return None
-    selisih = harga_kini - target
-    persen  = (selisih / target) * 100
-    return {
-        "harga_lalu": target,
-        "selisih":    selisih,
-        "persen":     round(persen, 2),
-        "naik":       selisih > 0,
-        "stabil":     abs(persen) < 0.1,
-    }
+
+        selisih = harga_sekarang - target
+        persen  = (selisih / target * 100
+                   if target else 0)
+        result[key] = {
+            "harga":  target,
+            "selisih": selisih,
+            "persen":  persen,
+            "naik":    selisih > 0,
+            "stabil":  abs(selisih) < 1000,
+        }
+
+    return result
+
 
 # ════════════════════════════════════════════════════════════
-# KALKULASI LENGKAP
+# MAIN — dipanggil dari video_maker.py
 # ════════════════════════════════════════════════════════════
 
-def scrape_dan_kalkulasi_harga():
+def ambil_harga_emas():
     log("[1/6] Scraping harga emas...")
-    history = _load_history()
+    harga = None
 
-    if not isinstance(history, list):
-        log("  -> WARNING: history bukan list, reset!")
-        history = []
+    # Sumber 1: logammulia.com
+    log("  -> Scraping: logammulia.com...")
+    harga = _scrape_logammulia()
 
-    harga = _scrape_harga()
-
+    # Sumber 2: emasantam.id
     if not harga:
-        if history and len(history) > 0:
-            harga = history[0]["harga"]
-            log(f"  -> Fallback ke history: "
-                f"Rp {harga:,}".replace(",","."))
-        else:
-            harga = 1_650_000
-            log(f"  -> Fallback default: "
-                f"Rp {harga:,}".replace(",","."))
+        log("  -> Scraping: emasantam.id...")
+        harga = _scrape_emasantam()
 
-    if history and len(history) > 0:
-        try:
-            harga_kemarin = int(history[0]["harga"])
-        except (KeyError, ValueError, TypeError):
-            harga_kemarin = harga
-    else:
-        harga_kemarin = harga
+    # Sumber 3: goodstats.id
+    if not harga:
+        log("  -> Scraping: goodstats.id...")
+        harga = _scrape_goodstats()
 
-    selisih     = harga - harga_kemarin
-    persen_hari = round(
-        (selisih / harga_kemarin * 100)
-        if harga_kemarin else 0, 2
-    )
+    # Tidak ada sumber yang berhasil
+    if not harga:
+        log("  -> ❌ Semua sumber gagal!")
+        raise ValueError(
+            "Tidak bisa mendapatkan harga emas "
+            "dari semua sumber."
+        )
 
-    if abs(persen_hari) < 0.05:
-        status = "Stabil"
-    elif selisih > 0:
+    log(f"  -> ✅ logammulia.com: {rp(harga)}")
+
+    # Hitung status vs kemarin
+    history     = _load_history()
+    hari_ini    = datetime.now().strftime("%Y-%m-%d")
+    kemarin_str = None
+    tanggal_list = sorted(history.keys(), reverse=True)
+    for tgl in tanggal_list:
+        if tgl != hari_ini:
+            kemarin_str = tgl
+            break
+
+    harga_kemarin = (history[kemarin_str]
+                     if kemarin_str else harga)
+    selisih       = harga - harga_kemarin
+    persen        = (selisih / harga_kemarin * 100
+                     if harga_kemarin else 0)
+
+    if selisih > 0:
         status = "Naik"
-    else:
+    elif selisih < 0:
         status = "Turun"
+    else:
+        status = "Stabil"
 
-    historis = {}
-    periode  = {
-        "kemarin": 1,  "7_hari":  7,
-        "1_bulan": 30, "3_bulan": 90,
-        "6_bulan": 180,"1_tahun": 365,
-    }
-    for key, hari in periode.items():
-        try:
-            historis[key] = _hitung_perubahan(
-                harga, history, hari
-            )
-        except Exception as e:
-            log(f"  -> WARNING historis [{key}]: {e}")
-            historis[key] = None
+    # Hitung historis
+    historis = _hitung_historis(history, harga)
 
-    entry = {
-        "tanggal": datetime.now().strftime("%Y-%m-%d"),
-        "waktu":   datetime.now().strftime("%H:%M:%S"),
-        "harga":   harga,
-    }
-    history.insert(0, entry)
-    _simpan_history(history)
+    # Simpan ke history
+    history[hari_ini] = harga
+    # Batasi history 400 hari
+    if len(history) > 400:
+        keys_old = sorted(history.keys())[
+            :len(history)-400
+        ]
+        for k in keys_old:
+            del history[k]
+    _save_history(history)
 
+    now  = datetime.now()
     info = {
         "harga_sekarang": harga,
         "harga_kemarin":  harga_kemarin,
-        "selisih":        abs(selisih),
-        "persen":         abs(persen_hari),
+        "selisih":        selisih,
+        "persen":         persen,
         "status":         status,
+        "tanggal":        now.strftime("%d %B %Y"),
+        "waktu":          now.strftime("%H:%M WIB"),
         "historis":       historis,
-        "tanggal":        datetime.now().strftime(
-                              "%d %B %Y"
-                          ),
-        "waktu":          datetime.now().strftime(
-                              "%H:%M WIB"
-                          ),
     }
 
-    log(f"  -> Harga   : Rp "
-        f"{harga:,}".replace(",","."))
-    log(f"  -> Status  : {status} "
-        f"({persen_hari:+.2f}%)")
-    log(f"  -> Selisih : Rp "
-        f"{abs(selisih):,}".replace(",","."))
+    log(f"  -> Harga   : {rp(harga)}")
+    log(f"  -> Status  : {status} ({persen:+.2f}%)")
+    log(f"  -> Selisih : {rp(selisih)}")
+
     return info

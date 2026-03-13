@@ -15,14 +15,18 @@ CHANNEL_CONFIG = {
         "keywords_img": [
             "gold bar antam indonesia",
             "gold bullion bar close up",
-            "antam logam mulia gold",
             "gold ingot stack shiny",
             "pure gold bar 999",
+            "gold jewelry ring bracelet",
+            "gold earrings necklace luxury",
+            "gold bangle accessories shiny",
+            "antam logam mulia gold",
         ],
         "keywords_vid": [
             "gold bar shiny close up",
             "gold bullion bar",
             "pure gold ingot",
+            "gold jewelry luxury",
         ],
     },
     2: {
@@ -36,12 +40,16 @@ CHANNEL_CONFIG = {
             "gold bar stack close up",
             "gold bullion investment",
             "gold ingot pile shiny",
+            "gold necklace luxury close up",
+            "gold bracelet shiny jewelry",
+            "gold ring elegant close up",
+            "gold earrings fashion jewelry",
             "antam gold bar indonesia",
-            "gold bar texture macro",
         ],
         "keywords_vid": [
             "gold bar investment",
             "gold bullion close up",
+            "gold jewelry luxury",
             "gold ingot shiny",
         ],
     },
@@ -56,12 +64,16 @@ CHANNEL_CONFIG = {
             "gold bar logam mulia",
             "gold bullion bar macro",
             "stacked gold ingot",
+            "gold necklace pendant luxury",
+            "gold bangles bracelets shiny",
+            "gold ring diamond jewelry",
             "pure gold bar reflection",
             "gold bar vault storage",
         ],
         "keywords_vid": [
             "gold bar vault",
             "stacked gold bullion",
+            "gold jewelry close up",
             "gold ingot macro",
         ],
     },
@@ -76,12 +88,16 @@ CHANNEL_CONFIG = {
             "gold bar luxury close up",
             "shiny gold bullion bar",
             "gold ingot premium",
+            "gold necklace elegant luxury",
+            "gold earrings drop luxury",
+            "gold bracelet chain shiny",
             "gold bar collection",
             "antam gold bullion bar",
         ],
         "keywords_vid": [
             "luxury gold bar",
             "shiny gold bullion",
+            "gold jewelry elegant",
             "premium gold ingot",
         ],
     },
@@ -95,12 +111,16 @@ CHANNEL_CONFIG = {
         "keywords_img": [
             "gold bar antam close up",
             "gold bullion bar shiny",
+            "gold ring jewelry close up",
+            "gold necklace chain luxury",
+            "gold earrings stud shiny",
+            "gold bracelet bangle close",
             "gold ingot stack macro",
             "pure gold bar indonesia",
-            "gold bar investment close",
         ],
         "keywords_vid": [
             "gold bar close up",
+            "gold jewelry luxury close",
             "gold bullion stack",
             "gold ingot indonesia",
         ],
@@ -116,8 +136,9 @@ NARASI_GAYA       = CFG["gaya"]
 KATA_KUNCI_GAMBAR = CFG["keywords_img"]
 KATA_KUNCI_VIDEO  = CFG["keywords_vid"]
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY", "")
+GEMINI_API_KEY  = os.environ.get("GEMINI_API_KEY",  "")
+PEXELS_API_KEY  = os.environ.get("PEXELS_API_KEY",  "")
+PIXABAY_API_KEY = os.environ.get("PIXABAY_API_KEY", "")
 
 YOUTUBE_CATEGORY = "25"
 YOUTUBE_TAGS     = [
@@ -252,5 +273,7 @@ SKEMA_AKTIF = SKEMA_THUMBNAIL.get(
 
 def log(msg):
     from datetime import datetime
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}",
-          flush=True)
+    print(
+        f"[{datetime.now().strftime('%H:%M:%S')}] {msg}",
+        flush=True
+    )

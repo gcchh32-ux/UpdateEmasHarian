@@ -7,6 +7,10 @@ def log(msg):
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}",
           flush=True)
 
+def rp(x):
+    """Format angka ke rupiah: 1650000 → Rp 1.650.000"""
+    return f"Rp {x:,}".replace(",", ".")
+
 def font_path():
     candidates = [
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
@@ -43,9 +47,9 @@ def get_font(fp, size=32):
     return ImageFont.load_default()
 
 def wrap_text(text, max_chars=30):
-    words  = text.split()
-    lines  = []
-    line   = ""
+    words = text.split()
+    lines = []
+    line  = ""
     for w in words:
         if len(line) + len(w) + 1 <= max_chars:
             line = (line + " " + w).strip()
@@ -59,7 +63,6 @@ def wrap_text(text, max_chars=30):
 
 def draw_rounded_rect(draw, x1, y1, x2, y2, radius,
                        fill=None, outline=None, width=1):
-    from PIL import ImageDraw
     if fill:
         draw.rounded_rectangle(
             [x1, y1, x2, y2], radius=radius,
@@ -84,7 +87,7 @@ def draw_text_stroke(draw, x, y, text, font,
 
 def crop_center_resize(img, w, h):
     from PIL import Image
-    iw, ih   = img.size
+    iw, ih    = img.size
     ar_target = w / h
     ar_img    = iw / ih
     if ar_img > ar_target:
@@ -133,15 +136,9 @@ def log_ffmpeg_tail(n=20):
     if not os.path.exists(FFMPEG_LOG):
         log("  -> ffmpeg_log.txt tidak ditemukan")
         return
-    with open(FFMPEG_LOG, encoding="utf-8", errors="ignore") as f:
+    with open(FFMPEG_LOG,
+              encoding="utf-8", errors="ignore") as f:
         lines = f.readlines()
     log(f"  -> === FFMPEG LOG (last {n} lines) ===")
     for line in lines[-n:]:
         log(f"  {line.rstrip()}")
-
-# utils.py — tambahkan di bagian bawah setelah log_ffmpeg_tail()
-
-def rp(x):
-    """Format angka ke rupiah: 1650000 → Rp 1.650.000"""
-    return f"Rp {x:,}".replace(",", ".")
-

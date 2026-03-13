@@ -36,7 +36,7 @@ from config   import (NAMA_CHANNEL, YOUTUBE_TAGS,
 from scrape   import ambil_harga_emas
 from narasi   import buat_narasi_dan_judul
 from store    import kelola_bank_gambar
-from render   import buat_suara, render_video
+from render   import buat_suara, proses_semua_klip, render_video_final
 from thumb    import buat_thumbnail
 from uploader import upload_ke_youtube
 from utils    import log, rp
@@ -51,10 +51,10 @@ async def main():
             f"{'='*60}\n"
         )
 
-    tanggal_str  = datetime.now().strftime('%Y%m%d')
-    audio_temp   = "suara.mp3"
-    video_hasil  = f"Video_Emas_{tanggal_str}.mp4"
-    thumb_hasil  = f"Thumbnail_{tanggal_str}.jpg"
+    tanggal_str = datetime.now().strftime('%Y%m%d')
+    audio_temp  = "suara.mp3"
+    video_hasil = f"Video_Emas_{tanggal_str}.mp4"
+    thumb_hasil = f"Thumbnail_{tanggal_str}.jpg"
 
     log(f"\n{'='*60}")
     log(f" AUTO VIDEO EMAS - {NAMA_CHANNEL}")
@@ -86,25 +86,33 @@ async def main():
 
     # ── 3. Generate suara ─────────────────────────────────────
     try:
-        durasi = await buat_suara(narasi, audio_temp)
+        durasi = buat_suara(narasi, audio_temp)
     except Exception as e:
         log(f"❌ Gagal generate suara: {e}")
         return
 
-    # ── 4. Render video ───────────────────────────────────────
-    sukses = render_video(audio_temp, video_hasil, durasi)
+    # ── 4. Siapkan klip visual ────────────────────────────────
+    file_list = proses_semua_klip(durasi)
+    if not file_list:
+        log("❌ Proses klip visual gagal.")
+        return
+
+    # ── 5. Render video final ─────────────────────────────────
+    sukses = render_video_final(
+        file_list, audio_temp, video_hasil, durasi
+    )
     if not sukses:
         log("❌ Render video gagal.")
         return
 
-    # ── 5. Buat thumbnail ─────────────────────────────────────
+    # ── 6. Buat thumbnail ─────────────────────────────────────
     try:
         buat_thumbnail(info, thumb_hasil)
     except Exception as e:
         log(f"⚠️ Thumbnail gagal (lanjut tanpa): {e}")
         thumb_hasil = None
 
-    # ── 6. Cek ukuran video ───────────────────────────────────
+    # ── 7. Cek ukuran video ───────────────────────────────────
     if not os.path.exists(video_hasil):
         log("❌ File video tidak ditemukan!")
         return
@@ -117,7 +125,7 @@ async def main():
             f"cek {FFMPEG_LOG}")
         return
 
-    # ── 7. Upload ke YouTube ──────────────────────────────────
+    # ── 8. Upload ke YouTube ──────────────────────────────────
     deskripsi = (
         f"Update harga emas Antam hari ini "
         f"{datetime.now().strftime('%d %B %Y')}.\n\n"

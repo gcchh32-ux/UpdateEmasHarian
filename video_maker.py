@@ -8,7 +8,7 @@ from config import (
 from utils     import log
 from store     import (kelola_bank_gambar, kelola_bank_video,
                        kelola_video_lama, debug_storage)
-from scrape    import scrape_dan_kalkulasi_harga
+from scraper import ambil_harga_emas
 from narasi    import buat_narasi_dan_judul
 from render    import (buat_suara, proses_semua_klip,
                        render_video_final)
@@ -33,7 +33,18 @@ def main():
     kelola_bank_video()
 
     # ── Step 2: Scraping harga ───────────────────────────
-    info = scrape_dan_kalkulasi_harga()
+    # SEKARANG (salah):
+
+    # GANTI JADI:
+    info = ambil_harga_emas()
+    data_harga = (
+    f"Tanggal: {info['tanggal']}. "
+    f"Harga 1 gram: Rp {info['harga_sekarang']:,}. "
+    f"Status: {info['status']} "
+    f"({info['persen']:+.2f}%). "
+    f"Selisih: Rp {info['selisih']:,}."
+    ).replace(",", ".")
+
 
     # ── Step 3: Buat narasi & judul ──────────────────────
     judul, narasi = buat_narasi_dan_judul(info)
@@ -123,3 +134,4 @@ def _cleanup(audio_file=None, file_list=None):
 
 if __name__ == "__main__":
     main()
+

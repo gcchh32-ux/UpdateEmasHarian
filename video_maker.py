@@ -5,7 +5,6 @@ import os
 import sys
 import subprocess
 import glob
-import json
 import asyncio
 from datetime import datetime
 
@@ -70,16 +69,8 @@ async def main():
         log("❌ Scraping gagal. Proses dihentikan.")
         return
 
-    data_harga = (
-        f"Tanggal: {info['tanggal']}. "
-        f"Harga 1 gram: {rp(info['harga_sekarang'])}. "
-        f"Status: {info['status']} "
-        f"({info['persen']:+.2f}%). "
-        f"Selisih: {rp(info['selisih'])}."
-    )
-
     # ── 2. Buat narasi & judul ────────────────────────────────
-    judul, narasi = buat_narasi_dan_judul(info, data_harga)
+    judul, narasi = buat_narasi_dan_judul(info)
     log(f"\n{'='*60}")
     log(f" JUDUL: {judul}")
     log(f"{'='*60}\n")

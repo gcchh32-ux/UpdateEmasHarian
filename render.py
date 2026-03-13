@@ -18,7 +18,7 @@ from store import list_gambar, list_video_bank
 
 def buat_suara(teks, output_audio):
     from config import VOICE, VOICE_RATE
-    import re
+    import re, tempfile
     log(f"[3/6] Generate suara...")
 
     teks_bersih = re.sub(
@@ -26,16 +26,37 @@ def buat_suara(teks, output_audio):
         r'[▲▼⬛📊📈📉💰🔥💥🚨🎯⚡😲🤔💡🛒🔴🟢⚠️📅💛]',
         '', teks
     ).strip()
+
+    # Bersihkan newline berlebih, ganti dengan spasi
+    teks_bersih = re.sub(r'\n+', ' ', teks_bersih)
+    teks_bersih = re.sub(r'\s+', ' ', teks_bersih).strip()
     log(f"  -> Panjang teks: {len(teks_bersih)} karakter")
 
-    cmd = [
-        sys.executable, '-m', 'edge_tts',
-        '--voice', VOICE,
-        '--rate',  VOICE_RATE,
-        '--text',  teks_bersih,
-        '--write-media', output_audio,
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    # Tulis ke file temp — hindari masalah argumen panjang di Linux
+    with tempfile.NamedTemporaryFile(
+        mode='w', suffix='.txt',
+        encoding='utf-8', delete=False
+    ) as tmp:
+        tmp.write(teks_bersih)
+        tmp_path = tmp.name
+
+    try:
+        cmd = [
+            sys.executable, '-m', 'edge_tts',
+            '--voice', VOICE,
+            '--rate',  VOICE_RATE,
+            '--file',  tmp_path,
+            '--write-media', output_audio,
+        ]
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=120
+        )
+    finally:
+        try:
+            os.remove(tmp_path)
+        except Exception:
+            pass
+
     if result.returncode != 0:
         log(f"  -> edge-tts stderr: {result.stderr[:300]}")
         raise RuntimeError(
@@ -47,8 +68,8 @@ def buat_suara(teks, output_audio):
             "File audio tidak terbuat atau terlalu kecil!"
         )
 
-    durasi   = ffmpeg_duration(output_audio)
-    size_kb  = os.path.getsize(output_audio) // 1024
+    durasi  = ffmpeg_duration(output_audio)
+    size_kb = os.path.getsize(output_audio) // 1024
     log(f"  -> ✅ Audio OK: {durasi:.0f}s "
         f"({durasi/60:.1f} menit) — {size_kb} KB")
 
@@ -57,6 +78,7 @@ def buat_suara(teks, output_audio):
             f"Audio terlalu pendek ({durasi:.1f}s)!"
         )
     return durasi
+
 
 
 # ════════════════════════════════════════════════════════════

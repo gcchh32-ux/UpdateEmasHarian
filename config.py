@@ -1,20 +1,13 @@
-# config.py — Semua konfigurasi channel
+# config.py
 import os
-
-# ════════════════════════════════════════════════════════════
-# CHANNEL ID — auto dari environment
-# ════════════════════════════════════════════════════════════
 
 _ch_raw    = os.environ.get("CHANNEL_ID", "").strip()
 CHANNEL_ID = int(_ch_raw) if _ch_raw.isdigit() else 1
 
-# ════════════════════════════════════════════════════════════
-# CONFIG PER CHANNEL
-# ════════════════════════════════════════════════════════════
-
 CHANNEL_CONFIG = {
     1: {
         "nama":        "Sobat Antam",
+        "sapaan":      "Sobat Antam",
         "voice":       "id-ID-ArdiNeural",
         "rate":        "+5%",
         "gaya":        "formal_analitis",
@@ -34,6 +27,7 @@ CHANNEL_CONFIG = {
     },
     2: {
         "nama":        "Update Emas Harian",
+        "sapaan":      "teman-teman",
         "voice":       "id-ID-GadisNeural",
         "rate":        "+3%",
         "gaya":        "santai_edukatif",
@@ -53,6 +47,7 @@ CHANNEL_CONFIG = {
     },
     3: {
         "nama":        "Info Logam Mulia",
+        "sapaan":      "pemirsa",
         "voice":       "id-ID-ArdiNeural",
         "rate":        "-3%",
         "gaya":        "berita_singkat",
@@ -72,6 +67,7 @@ CHANNEL_CONFIG = {
     },
     4: {
         "nama":        "Harga Emas Live",
+        "sapaan":      "guys",
         "voice":       "id-ID-GadisNeural",
         "rate":        "+8%",
         "gaya":        "energik_motivatif",
@@ -91,6 +87,7 @@ CHANNEL_CONFIG = {
     },
     5: {
         "nama":        "Cek Harga Emas",
+        "sapaan":      "sahabat",
         "voice":       "id-ID-ArdiNeural",
         "rate":        "+0%",
         "gaya":        "percakapan_akrab",
@@ -110,28 +107,17 @@ CHANNEL_CONFIG = {
     },
 }
 
-# ════════════════════════════════════════════════════════════
-# VARIABEL AKTIF — otomatis ikut CHANNEL_ID
-# ════════════════════════════════════════════════════════════
-
 CFG               = CHANNEL_CONFIG.get(CHANNEL_ID, CHANNEL_CONFIG[1])
 NAMA_CHANNEL      = CFG["nama"]
+SAPAAN            = CFG["sapaan"]
 VOICE             = CFG["voice"]
 VOICE_RATE        = CFG["rate"]
 NARASI_GAYA       = CFG["gaya"]
 KATA_KUNCI_GAMBAR = CFG["keywords_img"]
 KATA_KUNCI_VIDEO  = CFG["keywords_vid"]
 
-# ════════════════════════════════════════════════════════════
-# API KEYS — dari GitHub Secrets
-# ════════════════════════════════════════════════════════════
-
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY", "")
-
-# ════════════════════════════════════════════════════════════
-# YOUTUBE
-# ════════════════════════════════════════════════════════════
 
 YOUTUBE_CATEGORY = "25"
 YOUTUBE_TAGS     = [
@@ -141,181 +127,120 @@ YOUTUBE_TAGS     = [
     "update emas", "emas batangan", "antam",
 ]
 
-# ════════════════════════════════════════════════════════════
-# VIDEO SETTINGS
-# ════════════════════════════════════════════════════════════
-
 VIDEO_WIDTH  = 1920
 VIDEO_HEIGHT = 1080
 FPS          = 30
-
-# ════════════════════════════════════════════════════════════
-# STORAGE SETTINGS
-# ════════════════════════════════════════════════════════════
 
 FOLDER_GAMBAR     = "gambar_bank"
 FOLDER_VIDEO_BANK = "video_bank"
 JUMLAH_GAMBAR_MIN = 20
 JUMLAH_DL_GAMBAR  = 30
-JUMLAH_VIDEO_MIN  = 6
-JUMLAH_DL_VIDEO   = 10
+JUMLAH_VIDEO_MIN  = 4
+JUMLAH_DL_VIDEO   = 8
 SIMPAN_VIDEO_MAKS = 3
-
-# ════════════════════════════════════════════════════════════
-# LOG
-# ════════════════════════════════════════════════════════════
 
 FFMPEG_LOG   = "ffmpeg_log.txt"
 FILE_HISTORY = "history_harga.json"
 
-# ════════════════════════════════════════════════════════════
-# SKEMA WARNA THUMBNAIL
-# ════════════════════════════════════════════════════════════
-
 SKEMA_THUMBNAIL = {
     "merah_emas": {
         "Naik": {
-            "badge":        (200, 0,   0),
-            "aksen":        (255, 80,  0),
-            "teks":         (255, 220, 0),
-            "sub":          (255, 200, 150),
-            "hl_teks":      (255, 255, 255),
-            "icon":         "▲ NAIK",
-            "bg_grad_atas": (60,  0,   0),
+            "badge": (200,0,0), "aksen": (255,80,0),
+            "teks": (255,220,0), "sub": (255,200,150),
+            "hl_teks": (255,255,255), "icon": "▲ NAIK",
+            "bg_grad_atas": (60,0,0),
         },
         "Turun": {
-            "badge":        (0,   140, 50),
-            "aksen":        (0,   230, 80),
-            "teks":         (180, 255, 160),
-            "sub":          (200, 255, 200),
-            "hl_teks":      (255, 255, 255),
-            "icon":         "▼ TURUN",
-            "bg_grad_atas": (0,   40,  10),
+            "badge": (0,140,50), "aksen": (0,230,80),
+            "teks": (180,255,160), "sub": (200,255,200),
+            "hl_teks": (255,255,255), "icon": "▼ TURUN",
+            "bg_grad_atas": (0,40,10),
         },
         "Stabil": {
-            "badge":        (140, 100, 0),
-            "aksen":        (255, 190, 0),
-            "teks":         (255, 230, 100),
-            "sub":          (255, 240, 180),
-            "hl_teks":      (255, 255, 255),
-            "icon":         "= STABIL",
-            "bg_grad_atas": (40,  30,  0),
+            "badge": (140,100,0), "aksen": (255,190,0),
+            "teks": (255,230,100), "sub": (255,240,180),
+            "hl_teks": (255,255,255), "icon": "= STABIL",
+            "bg_grad_atas": (40,30,0),
         },
     },
     "biru_perak": {
         "Naik": {
-            "badge":        (0,   60,  180),
-            "aksen":        (0,   160, 255),
-            "teks":         (150, 220, 255),
-            "sub":          (200, 230, 255),
-            "hl_teks":      (255, 255, 255),
-            "icon":         "▲ NAIK",
-            "bg_grad_atas": (0,   20,  60),
+            "badge": (0,60,180), "aksen": (0,160,255),
+            "teks": (150,220,255), "sub": (200,230,255),
+            "hl_teks": (255,255,255), "icon": "▲ NAIK",
+            "bg_grad_atas": (0,20,60),
         },
         "Turun": {
-            "badge":        (0,   120, 160),
-            "aksen":        (0,   220, 200),
-            "teks":         (180, 255, 250),
-            "sub":          (200, 255, 255),
-            "hl_teks":      (255, 255, 255),
-            "icon":         "▼ TURUN",
-            "bg_grad_atas": (0,   35,  45),
+            "badge": (0,120,160), "aksen": (0,220,200),
+            "teks": (180,255,250), "sub": (200,255,255),
+            "hl_teks": (255,255,255), "icon": "▼ TURUN",
+            "bg_grad_atas": (0,35,45),
         },
         "Stabil": {
-            "badge":        (80,  80,  160),
-            "aksen":        (160, 160, 255),
-            "teks":         (200, 200, 255),
-            "sub":          (220, 220, 255),
-            "hl_teks":      (255, 255, 255),
-            "icon":         "= STABIL",
-            "bg_grad_atas": (20,  20,  50),
+            "badge": (80,80,160), "aksen": (160,160,255),
+            "teks": (200,200,255), "sub": (220,220,255),
+            "hl_teks": (255,255,255), "icon": "= STABIL",
+            "bg_grad_atas": (20,20,50),
         },
     },
     "hijau_platinum": {
         "Naik": {
-            "badge":        (0,   130, 60),
-            "aksen":        (0,   230, 100),
-            "teks":         (200, 255, 200),
-            "sub":          (220, 255, 220),
-            "hl_teks":      (0,   50,  0),
-            "icon":         "▲ NAIK",
-            "bg_grad_atas": (0,   40,  15),
+            "badge": (0,130,60), "aksen": (0,230,100),
+            "teks": (200,255,200), "sub": (220,255,220),
+            "hl_teks": (0,50,0), "icon": "▲ NAIK",
+            "bg_grad_atas": (0,40,15),
         },
         "Turun": {
-            "badge":        (180, 140, 0),
-            "aksen":        (255, 210, 0),
-            "teks":         (255, 240, 150),
-            "sub":          (255, 245, 180),
-            "hl_teks":      (50,  30,  0),
-            "icon":         "▼ TURUN",
-            "bg_grad_atas": (50,  40,  0),
+            "badge": (180,140,0), "aksen": (255,210,0),
+            "teks": (255,240,150), "sub": (255,245,180),
+            "hl_teks": (50,30,0), "icon": "▼ TURUN",
+            "bg_grad_atas": (50,40,0),
         },
         "Stabil": {
-            "badge":        (60,  120, 60),
-            "aksen":        (150, 255, 150),
-            "teks":         (220, 255, 220),
-            "sub":          (230, 255, 230),
-            "hl_teks":      (0,   50,  0),
-            "icon":         "= STABIL",
-            "bg_grad_atas": (15,  35,  15),
+            "badge": (60,120,60), "aksen": (150,255,150),
+            "teks": (220,255,220), "sub": (230,255,230),
+            "hl_teks": (0,50,0), "icon": "= STABIL",
+            "bg_grad_atas": (15,35,15),
         },
     },
     "ungu_mewah": {
         "Naik": {
-            "badge":        (120, 0,   180),
-            "aksen":        (220, 0,   255),
-            "teks":         (255, 180, 255),
-            "sub":          (240, 200, 255),
-            "hl_teks":      (255, 255, 255),
-            "icon":         "▲ NAIK",
-            "bg_grad_atas": (40,  0,   60),
+            "badge": (120,0,180), "aksen": (220,0,255),
+            "teks": (255,180,255), "sub": (240,200,255),
+            "hl_teks": (255,255,255), "icon": "▲ NAIK",
+            "bg_grad_atas": (40,0,60),
         },
         "Turun": {
-            "badge":        (80,  0,   140),
-            "aksen":        (180, 100, 255),
-            "teks":         (230, 200, 255),
-            "sub":          (240, 220, 255),
-            "hl_teks":      (255, 255, 255),
-            "icon":         "▼ TURUN",
-            "bg_grad_atas": (25,  0,   45),
+            "badge": (80,0,140), "aksen": (180,100,255),
+            "teks": (230,200,255), "sub": (240,220,255),
+            "hl_teks": (255,255,255), "icon": "▼ TURUN",
+            "bg_grad_atas": (25,0,45),
         },
         "Stabil": {
-            "badge":        (100, 50,  150),
-            "aksen":        (200, 150, 255),
-            "teks":         (240, 220, 255),
-            "sub":          (245, 230, 255),
-            "hl_teks":      (255, 255, 255),
-            "icon":         "= STABIL",
-            "bg_grad_atas": (30,  15,  50),
+            "badge": (100,50,150), "aksen": (200,150,255),
+            "teks": (240,220,255), "sub": (245,230,255),
+            "hl_teks": (255,255,255), "icon": "= STABIL",
+            "bg_grad_atas": (30,15,50),
         },
     },
     "oranye_tembaga": {
         "Naik": {
-            "badge":        (200, 80,  0),
-            "aksen":        (255, 140, 0),
-            "teks":         (255, 210, 100),
-            "sub":          (255, 225, 150),
-            "hl_teks":      (50,  20,  0),
-            "icon":         "▲ NAIK",
-            "bg_grad_atas": (60,  25,  0),
+            "badge": (200,80,0), "aksen": (255,140,0),
+            "teks": (255,210,100), "sub": (255,225,150),
+            "hl_teks": (50,20,0), "icon": "▲ NAIK",
+            "bg_grad_atas": (60,25,0),
         },
         "Turun": {
-            "badge":        (160, 60,  0),
-            "aksen":        (255, 100, 0),
-            "teks":         (255, 180, 100),
-            "sub":          (255, 200, 150),
-            "hl_teks":      (50,  15,  0),
-            "icon":         "▼ TURUN",
-            "bg_grad_atas": (50,  20,  0),
+            "badge": (160,60,0), "aksen": (255,100,0),
+            "teks": (255,180,100), "sub": (255,200,150),
+            "hl_teks": (50,15,0), "icon": "▼ TURUN",
+            "bg_grad_atas": (50,20,0),
         },
         "Stabil": {
-            "badge":        (180, 100, 0),
-            "aksen":        (255, 160, 50),
-            "teks":         (255, 220, 150),
-            "sub":          (255, 235, 180),
-            "hl_teks":      (50,  25,  0),
-            "icon":         "= STABIL",
-            "bg_grad_atas": (55,  30,  0),
+            "badge": (180,100,0), "aksen": (255,160,50),
+            "teks": (255,220,150), "sub": (255,235,180),
+            "hl_teks": (50,25,0), "icon": "= STABIL",
+            "bg_grad_atas": (55,30,0),
         },
     },
 }
@@ -325,13 +250,7 @@ SKEMA_AKTIF = SKEMA_THUMBNAIL.get(
     SKEMA_THUMBNAIL["merah_emas"]
 )
 
-# ════════════════════════════════════════════════════════════
-# LOG HELPER
-# ════════════════════════════════════════════════════════════
-
 def log(msg):
     from datetime import datetime
-    print(
-        f"[{datetime.now().strftime('%H:%M:%S')}] {msg}",
-        flush=True
-    )
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}",
+          flush=True)

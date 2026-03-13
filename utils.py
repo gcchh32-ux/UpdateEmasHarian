@@ -138,3 +138,10 @@ def log_ffmpeg_tail(n=20):
     log(f"  -> === FFMPEG LOG (last {n} lines) ===")
     for line in lines[-n:]:
         log(f"  {line.rstrip()}")
+
+# utils.py — tambahkan di bagian bawah setelah log_ffmpeg_tail()
+
+def rp(x):
+    """Format angka ke rupiah: 1650000 → Rp 1.650.000"""
+    return f"Rp {x:,}".replace(",", ".")
+

@@ -1,7 +1,7 @@
 # config.py
 import os
 
-_ch_raw    = os.environ.get("CHANNEL_ID", "").strip()
+_ch_raw    = os.environ.get("CHANNEL_ID", "1").strip()
 CHANNEL_ID = int(_ch_raw) if _ch_raw.isdigit() else 1
 
 CHANNEL_CONFIG = {

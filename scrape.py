@@ -48,7 +48,7 @@ def _scrape_logammulia(url):
             continue
         cells = row.find_all("td")
         for cell in cells:
-            txt = cell.get_text(strip=True)
+            txt   = cell.get_text(strip=True)
             clean = re.sub(r"[^\d]", "", txt)
             if clean and 900000 <= int(clean) <= 5000000:
                 return int(clean)
@@ -70,12 +70,15 @@ def _scrape_hargaemas_org(url):
             ["tr","div","span","p","td"])
         if not parent:
             continue
-        txt   = parent.get_text(strip=True)
-        nums  = re.findall(r"\d{3}[\d\.]+", txt)
+        txt  = parent.get_text(strip=True)
+        nums = re.findall(r"\d{3}[\d\.]+", txt)
         for n in nums:
             clean = re.sub(r"\.", "", n)
-            if 900000 <= int(clean) <= 5000000:
-                return int(clean)
+            try:
+                if 900000 <= int(clean) <= 5000000:
+                    return int(clean)
+            except:
+                continue
     patterns = [
         r"Rp\s*([\d\.]+)",
         r"([\d]{3}\.[\d]{3}\.[\d]{3})",
@@ -132,7 +135,8 @@ def _scrape_harga():
                     f"Rp {harga:,}".replace(",","."))
                 return harga
             else:
-                log(f"  -> {sumber['nama']}: tidak dapat harga")
+                log(f"  -> {sumber['nama']}: "
+                    f"tidak dapat harga")
         except Exception as e:
             log(f"  -> {sumber['nama']} error: {e}")
         time.sleep(1)
@@ -147,20 +151,32 @@ def _load_history():
         return []
     try:
         with open(FILE_HISTORY, encoding="utf-8") as f:
-            return json.load(f)
-    except:
+            data = json.load(f)
+        if not isinstance(data, list):
+            log("  -> WARNING: history bukan list, reset!")
+            return []
+        return data
+    except Exception as e:
+        log(f"  -> WARNING load history: {e}")
         return []
 
 def _simpan_history(history):
+    if not isinstance(history, list):
+        history = []
     history = history[:400]
     with open(FILE_HISTORY, "w", encoding="utf-8") as f:
-        json.dump(history, f, indent=2, ensure_ascii=False)
+        json.dump(history, f, indent=2,
+                  ensure_ascii=False)
 
 def _hitung_perubahan(harga_kini, history, hari):
+    if not isinstance(history, list):
+        return None
     target = None
     for h in history:
         try:
-            tgl = datetime.strptime(h["tanggal"], "%Y-%m-%d")
+            tgl   = datetime.strptime(
+                h["tanggal"], "%Y-%m-%d"
+            )
             delta = (datetime.now() - tgl).days
             if delta >= hari:
                 target = h["harga"]
@@ -186,10 +202,15 @@ def _hitung_perubahan(harga_kini, history, hari):
 def scrape_dan_kalkulasi_harga():
     log("[1/6] Scraping harga emas...")
     history = _load_history()
-    harga   = _scrape_harga()
+
+    if not isinstance(history, list):
+        log("  -> WARNING: history bukan list, reset!")
+        history = []
+
+    harga = _scrape_harga()
 
     if not harga:
-        if history:
+        if history and len(history) > 0:
             harga = history[0]["harga"]
             log(f"  -> Fallback ke history: "
                 f"Rp {harga:,}".replace(",","."))
@@ -198,10 +219,17 @@ def scrape_dan_kalkulasi_harga():
             log(f"  -> Fallback default: "
                 f"Rp {harga:,}".replace(",","."))
 
-    harga_kemarin = history[0]["harga"] if history else harga
-    selisih       = harga - harga_kemarin
-    persen_hari   = round(
-        (selisih / harga_kemarin) * 100
+    if history and len(history) > 0:
+        try:
+            harga_kemarin = int(history[0]["harga"])
+        except (KeyError, ValueError, TypeError):
+            harga_kemarin = harga
+    else:
+        harga_kemarin = harga
+
+    selisih     = harga - harga_kemarin
+    persen_hari = round(
+        (selisih / harga_kemarin * 100)
         if harga_kemarin else 0, 2
     )
 
@@ -219,9 +247,13 @@ def scrape_dan_kalkulasi_harga():
         "6_bulan": 180,"1_tahun": 365,
     }
     for key, hari in periode.items():
-        historis[key] = _hitung_perubahan(
-            harga, history, hari
-        )
+        try:
+            historis[key] = _hitung_perubahan(
+                harga, history, hari
+            )
+        except Exception as e:
+            log(f"  -> WARNING historis [{key}]: {e}")
+            historis[key] = None
 
     entry = {
         "tanggal": datetime.now().strftime("%Y-%m-%d"),

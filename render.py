@@ -6,7 +6,7 @@ from config import (
     NAMA_CHANNEL, FFMPEG_LOG,
     FOLDER_GAMBAR, FOLDER_VIDEO_BANK,
 )
-from utils  import (
+from utils import (
     log, font_path, escape_ffmpeg_path,
     ffmpeg_duration, ffmpeg_is_valid, log_ffmpeg_tail,
 )
@@ -19,8 +19,8 @@ from store import list_gambar, list_video_bank
 def buat_suara(teks, output_audio):
     from config import VOICE, VOICE_RATE
     import re, asyncio, threading
-    log("[3/6] Generate suara...")
 
+    log("[3/6] Generate suara...")
     teks_bersih = re.sub(
         r'\[.*?\]|\(.*?\)|\*.*?\*|'
         r'[▲▼⬛📊📈📉💰🔥💥🚨🎯⚡😲🤔💡🛒🔴🟢⚠️📅💛]',
@@ -28,6 +28,7 @@ def buat_suara(teks, output_audio):
     ).strip()
     teks_bersih = re.sub(r'\n+', ' ', teks_bersih)
     teks_bersih = re.sub(r'\s+', ' ', teks_bersih).strip()
+
     log(f"  -> Panjang teks: {len(teks_bersih)} karakter")
 
     async def _generate():
@@ -39,9 +40,8 @@ def buat_suara(teks, output_audio):
         )
         await communicate.save(output_audio)
 
-    # Jalankan di thread baru agar punya event loop sendiri
-    # (menghindari "cannot be called from a running event loop")
     error_container = []
+
     def _run_in_thread():
         try:
             asyncio.run(_generate())
@@ -55,8 +55,9 @@ def buat_suara(teks, output_audio):
     if t.is_alive():
         raise RuntimeError("edge-tts timeout (>120s)!")
     if error_container:
-        raise RuntimeError(f"edge-tts gagal: {error_container[0]}")
-
+        raise RuntimeError(
+            f"edge-tts gagal: {error_container[0]}"
+        )
     if not ffmpeg_is_valid(output_audio, min_size_kb=5):
         raise FileNotFoundError(
             "File audio tidak terbuat atau terlalu kecil!"
@@ -74,18 +75,27 @@ def buat_suara(teks, output_audio):
     return durasi
 
 
-
 # ════════════════════════════════════════════════════════════
-# BAGIAN 2 — KEN BURNS FILTER
+# BAGIAN 2 — KEN BURNS FILTER (6 variasi, tidak boleh sama)
 # ════════════════════════════════════════════════════════════
 
-def _get_ken_burns_filter(durasi=10.0):
+_KB_MODES     = list(range(1, 7))
+_last_kb_mode = None
+
+
+def _get_ken_burns_filter(durasi=10.0, exclude=None):
+    global _last_kb_mode
     try:
         dur = max(5.0, float(durasi))
-    except:
+    except Exception:
         dur = 10.0
+
     d_frames = int(FPS * dur)
-    mode     = random.randint(1, 6)
+
+    # Pilih mode random, hindari sama dengan sebelumnya
+    pool = [m for m in _KB_MODES if m != exclude]
+    mode = random.choice(pool)
+    _last_kb_mode = mode
 
     if mode == 1:
         z    = "if(eq(on,1),1.0,min(zoom+0.0004,1.15))"
@@ -133,7 +143,7 @@ def _get_ken_burns_filter(durasi=10.0):
         f"fade=t=in:st=0:d=0.5,"
         f"fade=t=out:st={dur-0.5:.1f}:d=0.5"
     )
-    return vf, name
+    return vf, name, mode
 
 
 # ════════════════════════════════════════════════════════════
@@ -141,15 +151,18 @@ def _get_ken_burns_filter(durasi=10.0):
 # ════════════════════════════════════════════════════════════
 
 def _render_klip_gambar(args):
-    i, img_path, fp, output_klip = args
-    durasi_klip = random.choice([8, 10, 12])
-    vf, mode    = _get_ken_burns_filter(durasi_klip)
+    i, img_path, fp, output_klip, exclude_mode = args
+
+    durasi_klip       = random.choice([8, 10, 12])
+    vf, mode, kb_mode = _get_ken_burns_filter(
+        durasi_klip, exclude=exclude_mode
+    )
 
     if fp:
         fe     = escape_ffmpeg_path(fp)
         x, y   = random.choice([
-            ("30","30"), ("w-tw-30","30"),
-            ("30","h-th-30"), ("w-tw-30","h-th-30"),
+            ("30", "30"), ("w-tw-30", "30"),
+            ("30", "h-th-30"), ("w-tw-30", "h-th-30"),
         ])
         ch_esc = NAMA_CHANNEL.replace("'", "\\'")
         vf    += (
@@ -161,32 +174,41 @@ def _render_klip_gambar(args):
 
     cmd = [
         'ffmpeg', '-y',
-        '-loop', '1', '-framerate', str(FPS),
+        '-loop', '1',
+        '-framerate', str(FPS),
         '-i', img_path,
-        '-f', 'lavfi', '-i',
-        'anullsrc=channel_layout=stereo:sample_rate=44100',
+        '-f', 'lavfi',
+        '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
         '-vf', vf,
         '-map', '0:v', '-map', '1:a',
-        '-c:v', 'libx264', '-preset', 'faster',
-        '-pix_fmt', 'yuv420p', '-crf', '23',
-        '-c:a', 'aac', '-ar', '44100', '-ac', '2',
+        '-c:v', 'libx264',
+        '-preset', 'faster',
+        '-pix_fmt', 'yuv420p',
+        '-crf', '23',
+        '-c:a', 'aac',
+        '-ar', '44100',
+        '-ac', '2',
         '-t', str(durasi_klip),
         output_klip,
     ]
+
     with open(FFMPEG_LOG, 'a', encoding='utf-8') as lf:
-        lf.write(f"\n=== KLIP-IMG {i} [{mode}]: "
-                 f"{os.path.basename(img_path)} ===\n")
+        lf.write(
+            f"\n=== KLIP-IMG {i} [{mode}]: "
+            f"{os.path.basename(img_path)} ===\n"
+        )
         result = subprocess.run(
             cmd, stdout=subprocess.DEVNULL, stderr=lf
         )
 
-    ok = (result.returncode == 0 and
-          ffmpeg_is_valid(output_klip, min_size_kb=10))
+    ok = (result.returncode == 0
+          and ffmpeg_is_valid(output_klip, min_size_kb=10))
     if not ok:
         log(f"  -> [GAGAL] Klip-IMG {i}: "
             f"{os.path.basename(img_path)}")
         return None
-    return i, output_klip, durasi_klip
+
+    return i, output_klip, durasi_klip, kb_mode
 
 
 # ════════════════════════════════════════════════════════════
@@ -195,21 +217,21 @@ def _render_klip_gambar(args):
 
 def _render_klip_video(args):
     i, vid_path, fp, output_klip = args
-    durasi_klip = random.choice([8, 10, 12])
 
+    durasi_klip = random.choice([8, 10, 12])
     try:
         dur_src = ffmpeg_duration(vid_path)
-    except:
+    except Exception:
         dur_src = 30.0
+
     if dur_src < 3:
         log(f"  -> Skip video pendek: "
             f"{os.path.basename(vid_path)}")
         return None
 
     max_start = max(0, dur_src - durasi_klip - 1)
-    start     = round(
-        random.uniform(0, max_start), 1
-    ) if max_start > 0 else 0.0
+    start     = (round(random.uniform(0, max_start), 1)
+                 if max_start > 0 else 0.0)
 
     vf = (
         f"scale={VIDEO_WIDTH}:{VIDEO_HEIGHT}:"
@@ -225,8 +247,8 @@ def _render_klip_video(args):
     if fp:
         fe     = escape_ffmpeg_path(fp)
         x, y   = random.choice([
-            ("30","30"), ("w-tw-30","30"),
-            ("30","h-th-30"), ("w-tw-30","h-th-30"),
+            ("30", "30"), ("w-tw-30", "30"),
+            ("30", "h-th-30"), ("w-tw-30", "h-th-30"),
         ])
         ch_esc = NAMA_CHANNEL.replace("'", "\\'")
         vf    += (
@@ -242,25 +264,33 @@ def _render_klip_video(args):
         '-i', vid_path,
         '-t', str(durasi_klip),
         '-vf', vf,
-        '-c:v', 'libx264', '-preset', 'faster',
-        '-pix_fmt', 'yuv420p', '-crf', '23',
-        '-c:a', 'aac', '-ar', '44100', '-ac', '2',
+        '-c:v', 'libx264',
+        '-preset', 'faster',
+        '-pix_fmt', 'yuv420p',
+        '-crf', '23',
+        '-c:a', 'aac',
+        '-ar', '44100',
+        '-ac', '2',
         output_klip,
     ]
+
     with open(FFMPEG_LOG, 'a', encoding='utf-8') as lf:
-        lf.write(f"\n=== KLIP-VID {i}: "
-                 f"{os.path.basename(vid_path)} "
-                 f"(ss={start}) ===\n")
+        lf.write(
+            f"\n=== KLIP-VID {i}: "
+            f"{os.path.basename(vid_path)} "
+            f"(ss={start}) ===\n"
+        )
         result = subprocess.run(
             cmd, stdout=subprocess.DEVNULL, stderr=lf
         )
 
-    ok = (result.returncode == 0 and
-          ffmpeg_is_valid(output_klip, min_size_kb=10))
+    ok = (result.returncode == 0
+          and ffmpeg_is_valid(output_klip, min_size_kb=10))
     if not ok:
         log(f"  -> [GAGAL] Klip-VID {i}: "
             f"{os.path.basename(vid_path)}")
         return None
+
     return i, output_klip, durasi_klip
 
 
@@ -275,6 +305,7 @@ def proses_semua_klip(durasi_total_detik):
 
     gambar_list = list_gambar()
     video_list  = list_video_bank()
+
     log(f"  -> Bank: {len(gambar_list)} gambar, "
         f"{len(video_list)} video")
 
@@ -297,16 +328,18 @@ def proses_semua_klip(durasi_total_detik):
     tasks   = []
     counter = 0
 
-    def repeat_list(lst, n):
-        result = []
-        while len(result) < n:
-            result.extend(lst)
-        return result[:n]
-
+    # ── Video bank ────────────────────────────────────────
     if n_video > 0 and video_list:
+        def repeat_list(lst, n):
+            result = []
+            while len(result) < n:
+                result.extend(lst)
+            return result[:n]
+
         vids = repeat_list(
             random.sample(
-                video_list, min(len(video_list), n_video)
+                video_list,
+                min(len(video_list), n_video)
             ),
             n_video,
         )
@@ -318,19 +351,27 @@ def proses_semua_klip(durasi_total_detik):
             tasks.append(('video', counter, vid, fp, out))
             counter += 1
 
+    # ── Gambar — pakai TEPAT 2 gambar, alternasi ─────────
     if n_gambar > 0 and gambar_list:
-        imgs = repeat_list(
-            random.sample(
-                gambar_list, min(len(gambar_list), n_gambar)
-            ),
-            n_gambar,
+        # Ambil 2 gambar berbeda secara random
+        dua_img = random.sample(
+            gambar_list, min(2, len(gambar_list))
         )
-        random.shuffle(imgs)
-        for img in imgs:
+        if len(dua_img) == 1:
+            dua_img = dua_img * 2   # duplikasi jika hanya 1
+
+        last_kb = None
+        for j in range(n_gambar):
+            img = dua_img[j % 2]   # alternasi gambar 1 & 2
             out = os.path.abspath(
                 f"temp_clips/klip_{counter:04d}.mp4"
             )
-            tasks.append(('gambar', counter, img, fp, out))
+            # Kirim last_kb agar fungsi render bisa hindari duplikasi
+            tasks.append(
+                ('gambar', counter, img, fp, out, last_kb)
+            )
+            # Perbarui last_kb (estimasi — akan diperbarui setelah render)
+            last_kb = (last_kb % 6 + 1) if last_kb else 1
             counter += 1
 
     random.shuffle(tasks)
@@ -347,8 +388,13 @@ def proses_semua_klip(durasi_total_detik):
             _, i, path, fp_, out = task
             return _render_klip_video((i, path, fp_, out))
         else:
-            _, i, path, fp_, out = task
-            return _render_klip_gambar((i, path, fp_, out))
+            # gambar: bisa 5 atau 6 elemen
+            if len(task) == 6:
+                _, i, path, fp_, out, excl = task
+            else:
+                _, i, path, fp_, out = task
+                excl = None
+            return _render_klip_gambar((i, path, fp_, out, excl))
 
     with ThreadPoolExecutor(max_workers=max_workers) as ex:
         futures = {
@@ -357,13 +403,17 @@ def proses_semua_klip(durasi_total_detik):
         for future in as_completed(futures):
             hasil = future.result()
             if hasil:
-                idx, path, dur = hasil
+                if len(hasil) == 4:
+                    idx, path, dur, _ = hasil
+                else:
+                    idx, path, dur = hasil
                 klip_berhasil[idx] = (path, dur)
-                print(
-                    f"  -> {len(klip_berhasil)}"
-                    f"/{len(tasks)} klip selesai",
-                    end='\r', flush=True,
-                )
+            print(
+                f"  -> {len(klip_berhasil)}"
+                f"/{len(tasks)} klip selesai",
+                end='\r', flush=True,
+            )
+
     print()
     log(f"  -> {len(klip_berhasil)}/{len(tasks)} "
         f"klip berhasil")
@@ -415,15 +465,20 @@ def render_video_final(file_list, audio, output, durasi):
         'ffmpeg', '-y',
         '-f', 'concat', '-safe', '0', '-i', file_list,
         '-i', audio,
-        '-map', '0:v', '-map', '1:a',
+        '-map', '0:v',
+        '-map', '1:a',
         '-vf', (
             f'format=yuv420p,fps={FPS},'
             f'scale={VIDEO_WIDTH}:{VIDEO_HEIGHT}'
         ),
-        '-c:v', 'libx264', '-preset', 'fast', '-crf', '22',
+        '-c:v', 'libx264',
+        '-preset', 'fast',
+        '-crf', '22',
         '-pix_fmt', 'yuv420p',
-        '-c:a', 'aac', '-b:a', '192k',
-        '-ar', '44100', '-ac', '2',
+        '-c:a', 'aac',
+        '-b:a', '192k',
+        '-ar', '44100',
+        '-ac', '2',
         '-t', str(int(durasi) + 3),
         '-avoid_negative_ts', 'make_zero',
         '-fflags', '+genpts',
@@ -457,4 +512,5 @@ def render_video_final(file_list, audio, output, durasi):
     if ukuran_mb < 5:
         log(f"  -> WARNING: Ukuran sangat kecil "
             f"({ukuran_mb} MB)!")
+
     return True

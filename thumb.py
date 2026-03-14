@@ -50,7 +50,6 @@ def _bersih(judul):
     ).strip()
 
 def _foto_bg(brightness=0.85, blur=2):
-    """Ambil foto dari bank, tampilkan cerah dengan blur minimal."""
     from PIL import Image, ImageFilter, ImageEnhance
     gb = _list_gambar()
     if not gb:
@@ -72,443 +71,502 @@ def _solid_bg(color=(20, 15, 5)):
     return Image.new("RGB", (W, H), color)
 
 def _overlay_warna(img, color, alpha):
-    """Tempel warna overlay transparan di atas foto."""
     from PIL import Image
     ov  = Image.new("RGBA", (W, H),
                     (color[0], color[1], color[2], alpha))
-    out = Image.alpha_composite(
-        img.convert("RGBA"), ov
-    )
+    out = Image.alpha_composite(img.convert("RGBA"), ov)
     return out.convert("RGB")
 
 def _overlay_gradient(img, color, dari="kiri",
-                        alpha_maks=200, alpha_min=20):
-    """Gradient overlay dari satu sisi agar teks mudah dibaca."""
+                       alpha_maks=200, alpha_min=20):
     from PIL import Image, ImageDraw
     ov = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     od = ImageDraw.Draw(ov)
     r, g, b = color
     for i in range(W):
         if dari == "kiri":
-            a = int(alpha_maks - (alpha_maks - alpha_min)
-                    * (i / W))
+            a = int(alpha_maks - (alpha_maks - alpha_min) * (i / W))
         elif dari == "kanan":
-            a = int(alpha_min + (alpha_maks - alpha_min)
-                    * (i / W))
+            a = int(alpha_min + (alpha_maks - alpha_min) * (i / W))
         elif dari == "bawah":
-            a = int(alpha_min + (alpha_maks - alpha_min)
-                    * (i / H))
+            a = int(alpha_min + (alpha_maks - alpha_min) * (i / H))
+        elif dari == "atas":
+            a = int(alpha_maks - (alpha_maks - alpha_min) * (i / H))
         else:
-            a = int(alpha_maks - (alpha_maks - alpha_min)
-                    * (i / W))
+            a = int(alpha_maks - (alpha_maks - alpha_min) * (i / W))
         od.line([(i, 0), (i, H)], fill=(r, g, b, a))
-    return Image.alpha_composite(
-        img.convert("RGBA"), ov
-    ).convert("RGB")
+    return Image.alpha_composite(img.convert("RGBA"), ov).convert("RGB")
 
-def _label_status(draw, fp, info, x, y):
-    """Badge STATUS berwarna cerah."""
-    st    = info["status"]
-    sel   = _rp(info["selisih"])
-    pct   = f"{info['persen']:.1f}%"
-    if st == "Naik":
-        bg_c  = (0, 200, 80)
-        txt_c = (0, 60, 20)
-        icon  = "▲"
-        label = f"NAIK {pct}"
-    elif st == "Turun":
-        bg_c  = (220, 40, 40)
-        txt_c = (255, 255, 255)
-        icon  = "▼"
-        label = f"TURUN {pct}"
-    else:
-        bg_c  = (255, 190, 0)
-        txt_c = (60, 40, 0)
-        icon  = "="
-        label = "STABIL"
-    bw = len(label) * 22 + 60
-    draw_rounded_rect(draw, x, y, x+bw, y+54, 27,
-                       fill=bg_c)
-    draw.text((x+18, y+10),
-              f"{icon}  {label}",
-              font=get_font(fp, 30), fill=txt_c)
-
-def _harga_box(draw, fp, info, x, y, warna_harga,
-                warna_sub=(255, 255, 255)):
-    """Kotak harga besar dengan shadow."""
-    harga = f"{info['harga_sekarang']:,}".replace(",",".")
-    draw_text_stroke(draw, x, y, "Rp",
-                      get_font(fp, 44), warna_sub, stroke=3,
-                      stroke_fill=(0, 0, 0))
-    draw_text_stroke(draw, x, y+44, harga,
-                      get_font(fp, 96), warna_harga,
-                      stroke=5, stroke_fill=(0, 0, 0))
-    draw_text_stroke(draw, x+4, y+148, "per gram · Antam",
-                      get_font(fp, 30), warna_sub, stroke=2,
-                      stroke_fill=(0, 0, 0))
-
-def _judul_multiline(draw, fp, judul, x, y, w=22,
-                      warna=(255, 255, 255), maks=3):
-    baris = wrap_text(_bersih(judul), w)
-    yy    = y
-    for idx, b in enumerate(baris[:maks]):
-        sz = 44 if idx == 0 else 34
-        draw_text_stroke(draw, x, yy, b,
-                          get_font(fp, sz), warna,
-                          stroke=3,
-                          stroke_fill=(0, 0, 0))
-        yy += sz + 10
-
-def _watermark(draw, fp, x=None, y=None,
-                warna=(255, 255, 255, 180)):
-    if x is None: x = 30
-    if y is None: y = H - 50
-    draw_text_stroke(draw, x, y, NAMA_CHANNEL,
-                      get_font(fp, 26),
-                      (255, 255, 255), stroke=2,
-                      stroke_fill=(0, 0, 0))
-    draw.text((x, y + 28),
-              datetime.now().strftime("%d %B %Y"),
-              font=get_font(fp, 20),
-              fill=(220, 220, 220))
-
-def _historis_panel(draw, fp, info, x, y, warna_judul,
-                     warna_val=(255, 255, 255)):
-    """Panel historis dengan background gelap transparan."""
-    from PIL import Image, ImageDraw as ID
-    historis = info.get("historis", {})
-    lbl_map  = [
-        ("kemarin","Kemarin"),
-        ("7_hari","7 Hari"),
-        ("1_bulan","1 Bulan"),
-        ("3_bulan","3 Bulan"),
-        ("6_bulan","6 Bulan"),
-        ("1_tahun","1 Tahun"),
-    ]
-    draw_text_stroke(draw, x, y, "PERUBAHAN HARGA",
-                      get_font(fp, 24), warna_judul,
-                      stroke=2, stroke_fill=(0,0,0))
-    yi = y + 36
-    for lb, nama in lbl_map:
-        d = historis.get(lb)
-        if not d:
-            continue
-        wc  = (80, 255, 120)  if d["naik"]        else \
-              (255, 100, 100) if not d["stabil"]   else \
-              (255, 220, 80)
-        ar  = "▲" if d["naik"] else \
-              ("▼" if not d["stabil"] else "→")
-        draw_text_stroke(draw, x, yi, nama+":",
-                          get_font(fp, 22),
-                          (230, 230, 230), stroke=1,
-                          stroke_fill=(0,0,0))
-        draw_text_stroke(draw, x+150, yi,
-                          f"{ar} {abs(d['persen']):.1f}%",
-                          get_font(fp, 24), wc,
-                          stroke=2, stroke_fill=(0,0,0))
-        yi += 40
-        if yi > H - 60:
-            break
+def _overlay_gradient_vertikal(img, color, dari="bawah",
+                                alpha_maks=220, alpha_min=0):
+    from PIL import Image, ImageDraw
+    ov = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    od = ImageDraw.Draw(ov)
+    r, g, b = color
+    for i in range(H):
+        if dari == "bawah":
+            a = int(alpha_min + (alpha_maks - alpha_min) * (i / H))
+        else:
+            a = int(alpha_maks - (alpha_maks - alpha_min) * (i / H))
+        od.line([(0, i), (W, i)], fill=(r, g, b, a))
+    return Image.alpha_composite(img.convert("RGBA"), ov).convert("RGB")
 
 
 # ════════════════════════════════════════════════════════════
-# TEMPLATE 1 — Merah-Emas Cerah | Channel 1: Sobat Antam
-# Foto full + gradient kiri gelap + harga kuning besar
+# TEMPLATE 1 — Channel 1: Sobat Antam
+# Warna muda: Kuning Hangat & Oranye Pastel
+# Letak teks: KIRI BAWAH
+# Gaya: Bold, besar, stroke tebal — keliatan dari jauh
 # ════════════════════════════════════════════════════════════
 
 def _tmpl_ch1(info, judul, output_path):
     from PIL import Image, ImageDraw
-    fp  = _fp()
-    sk  = _sk(info)
+    fp = _fp()
 
-    # Foto cerah blur ringan
-    img = _foto_bg(brightness=0.9, blur=1)
-    # Gradient kiri hitam agar teks terbaca
-    img = _overlay_gradient(img, (0,0,0),
-                             dari="kiri",
-                             alpha_maks=210, alpha_min=10)
+    img  = _foto_bg(brightness=0.95, blur=1)
+    # Gradient dari bawah ke atas — area teks bawah gelap
+    img  = _overlay_gradient_vertikal(
+        img, (20, 10, 0), dari="bawah",
+        alpha_maks=210, alpha_min=10
+    )
+    # Sisi kiri sedikit redup
+    img  = _overlay_gradient(
+        img, (10, 5, 0), dari="kiri",
+        alpha_maks=120, alpha_min=0
+    )
     draw = ImageDraw.Draw(img)
 
-    # Aksen bar merah kiri
-    for i in range(18):
-        draw.line([(i,0),(i,H)],
-                  fill=(220, 30, 30))
+    st   = info["status"]
+    harga = f"{info['harga_sekarang']:,}".replace(",", ".")
 
-    # Badge status
-    _label_status(draw, fp, info, 26, 24)
+    # ── Badge status (kiri atas, bulat) ──
+    if st == "Naik":
+        bg_badge = (255, 220, 100)   # kuning pastel
+        tc_badge = (80, 50, 0)
+        icon     = "▲ NAIK"
+    elif st == "Turun":
+        bg_badge = (255, 180, 120)   # oranye muda
+        tc_badge = (80, 30, 0)
+        icon     = "▼ TURUN"
+    else:
+        bg_badge = (220, 240, 180)   # hijau muda
+        tc_badge = (40, 60, 10)
+        icon     = "= STABIL"
 
-    # Harga
-    _harga_box(draw, fp, info, 26, 90,
-               warna_harga=(255, 215, 0),
-               warna_sub=(255, 240, 200))
+    bw = len(icon) * 20 + 50
+    draw_rounded_rect(draw, 30, 24, 30 + bw, 78, 24,
+                      fill=bg_badge)
+    draw.text((48, 32), icon,
+              font=get_font(fp, 32), fill=tc_badge)
 
-    # Judul
-    _judul_multiline(draw, fp, judul, 26, 300,
-                     w=24, warna=(255, 255, 255))
+    # ── Nama channel kanan atas — kuning muda + stroke ──
+    draw_text_stroke(draw, W - 30, 28,
+                     NAMA_CHANNEL,
+                     get_font(fp, 26),
+                     (255, 235, 130),
+                     stroke=3,
+                     stroke_fill=(80, 40, 0),
+                     anchor="rt")
 
-    # Historis kanan
-    _historis_panel(draw, fp, info,
-                    x=W//2+80, y=24,
-                    warna_judul=(255, 215, 0))
+    # ── Harga besar di bawah ──
+    draw_text_stroke(draw, 34, H - 230, "Harga per gram",
+                     get_font(fp, 30),
+                     (255, 230, 160),
+                     stroke=2, stroke_fill=(0, 0, 0))
+    draw_text_stroke(draw, 30, H - 196,
+                     f"Rp {harga}",
+                     get_font(fp, 100),
+                     (255, 240, 100),
+                     stroke=6, stroke_fill=(80, 40, 0))
 
-    # Garis bawah emas
-    draw.rectangle([0, H-8, W, H],
-                   fill=(255, 180, 0))
+    # ── Selisih ──
+    sel = _rp(info["selisih"])
+    ar  = "▲ naik" if st == "Naik" else \
+          ("▼ turun" if st == "Turun" else "= stabil")
+    draw_text_stroke(draw, 34, H - 88,
+                     f"{ar}  {sel}",
+                     get_font(fp, 36),
+                     (255, 210, 120),
+                     stroke=3, stroke_fill=(0, 0, 0))
 
-    _watermark(draw, fp)
+    # ── Tanggal pojok kanan bawah ──
+    tgl = datetime.now().strftime("%d %B %Y")
+    draw_text_stroke(draw, W - 30, H - 36,
+                     tgl, get_font(fp, 26),
+                     (255, 235, 180),
+                     stroke=2, stroke_fill=(0, 0, 0),
+                     anchor="rb")
+
+    # ── Stripe oranye bawah ──
+    draw.rectangle([0, H - 10, W, H], fill=(255, 160, 40))
+
     img.save(output_path, "JPEG", quality=96)
     log(f"  -> ✅ T1 saved: {output_path}")
     return output_path
 
 
 # ════════════════════════════════════════════════════════════
-# TEMPLATE 2 — Biru Terang | Channel 2: Update Emas Harian
-# Split 50/50: foto kanan, panel biru kiri
+# TEMPLATE 2 — Channel 2: Update Emas Harian
+# Warna muda: Biru Muda & Biru Langit Pastel
+# Letak teks: KANAN BAWAH
+# Gaya: Modern clean, panel kanan semi-transparan
 # ════════════════════════════════════════════════════════════
 
 def _tmpl_ch2(info, judul, output_path):
     from PIL import Image, ImageDraw
-    fp   = _fp()
-    sk   = _sk(info)
+    fp = _fp()
 
-    # Base foto cerah
-    foto = _foto_bg(brightness=1.0, blur=0)
-    img  = Image.new("RGB", (W, H), (10, 30, 80))
-
-    # Foto di sisi kanan (60%)
-    foto_w = int(W * 0.6)
-    foto_r = foto.crop((0, 0, foto_w, H))
-    img.paste(foto_r, (W - foto_w, 0))
-
-    # Gradient biru dari kiri menutupi foto
-    ov = Image.new("RGBA", (W, H), (0,0,0,0))
-    od = ImageDraw.Draw(ov)
-    for x in range(W):
-        a = max(0, min(255, int(255 - (x/(W*0.55))*255)))
-        od.line([(x,0),(x,H)], fill=(10,40,120,a))
-    img = Image.alpha_composite(
-        img.convert("RGBA"), ov
-    ).convert("RGB")
+    img  = _foto_bg(brightness=1.0, blur=0)
+    # Gradient dari kanan (panel teks kanan)
+    img  = _overlay_gradient(
+        img, (0, 30, 80), dari="kanan",
+        alpha_maks=230, alpha_min=0
+    )
     draw = ImageDraw.Draw(img)
 
-    # Garis terang atas
-    draw.rectangle([0, 0, W, 8], fill=(0, 180, 255))
+    st    = info["status"]
+    harga = f"{info['harga_sekarang']:,}".replace(",", ".")
+    tgl   = datetime.now().strftime("%d %B %Y")
 
-    # Badge status
-    _label_status(draw, fp, info, 30, 20)
+    # ── Stripe biru atas ──
+    draw.rectangle([0, 0, W, 10], fill=(100, 200, 255))
 
-    # Label channel
-    draw_text_stroke(draw, 30, 82, NAMA_CHANNEL.upper(),
-                      get_font(fp, 22),
-                      (0, 200, 255), stroke=1,
-                      stroke_fill=(0,20,60))
+    # ── Badge status kiri atas ──
+    if st == "Naik":
+        bg_badge = (160, 230, 255)   # biru muda
+        tc_badge = (0, 50, 100)
+        icon     = "▲ NAIK"
+    elif st == "Turun":
+        bg_badge = (180, 210, 255)   # biru lavender
+        tc_badge = (20, 20, 100)
+        icon     = "▼ TURUN"
+    else:
+        bg_badge = (200, 240, 255)   # biru terang
+        tc_badge = (0, 60, 100)
+        icon     = "= STABIL"
 
-    # Harga
-    _harga_box(draw, fp, info, 30, 112,
-               warna_harga=(0, 230, 255),
-               warna_sub=(200, 240, 255))
+    bw = len(icon) * 20 + 50
+    draw_rounded_rect(draw, 24, 20, 24 + bw, 74, 24,
+                      fill=bg_badge)
+    draw.text((40, 28), icon,
+              font=get_font(fp, 32), fill=tc_badge)
 
-    # Judul
-    _judul_multiline(draw, fp, judul, 30, 310,
-                     w=22, warna=(255, 255, 255))
+    # ── Nama channel kiri bawah ──
+    draw_text_stroke(draw, 30, H - 44,
+                     NAMA_CHANNEL,
+                     get_font(fp, 28),
+                     (160, 230, 255),
+                     stroke=3, stroke_fill=(0, 20, 60))
 
-    # Garis bawah biru
-    draw.rectangle([0, H-8, W, H], fill=(0,150,255))
+    # ── Label kanan ──
+    draw_text_stroke(draw, W - 36, H - 230,
+                     "Update Harga Emas",
+                     get_font(fp, 28),
+                     (180, 225, 255),
+                     stroke=2, stroke_fill=(0, 0, 0),
+                     anchor="rt")
 
-    _watermark(draw, fp)
+    # ── Harga kanan bawah ──
+    draw_text_stroke(draw, W - 30, H - 196,
+                     f"Rp {harga}",
+                     get_font(fp, 92),
+                     (200, 240, 255),
+                     stroke=6, stroke_fill=(0, 30, 80),
+                     anchor="rt")
+    draw_text_stroke(draw, W - 30, H - 96,
+                     "per gram · Antam",
+                     get_font(fp, 32),
+                     (160, 215, 255),
+                     stroke=2, stroke_fill=(0, 0, 0),
+                     anchor="rt")
+
+    # ── Tanggal ──
+    draw_text_stroke(draw, W - 30, H - 50,
+                     tgl, get_font(fp, 26),
+                     (180, 230, 255),
+                     stroke=2, stroke_fill=(0, 0, 0),
+                     anchor="rt")
+
+    # ── Stripe biru bawah ──
+    draw.rectangle([0, H - 10, W, H], fill=(100, 200, 255))
+
     img.save(output_path, "JPEG", quality=96)
     log(f"  -> ✅ T2 saved: {output_path}")
     return output_path
 
 
 # ════════════════════════════════════════════════════════════
-# TEMPLATE 3 — Hijau Segar | Channel 3: Info Logam Mulia
-# Foto blur + overlay hijau gelap + historis kanan
+# TEMPLATE 3 — Channel 3: Info Logam Mulia
+# Warna muda: Hijau Mint & Hijau Pastel
+# Letak teks: TENGAH BAWAH (center)
+# Gaya: News bar bawah lebar, teks center
 # ════════════════════════════════════════════════════════════
 
 def _tmpl_ch3(info, judul, output_path):
     from PIL import Image, ImageDraw
-    fp  = _fp()
+    fp = _fp()
 
-    img  = _foto_bg(brightness=0.85, blur=3)
-    img  = _overlay_warna(img, (0, 40, 20), 160)
-    img  = _overlay_gradient(img, (0, 20, 10),
-                              dari="kiri",
-                              alpha_maks=180, alpha_min=0)
+    img  = _foto_bg(brightness=1.0, blur=1)
+    # Gradient bawah gelap untuk news bar
+    img  = _overlay_gradient_vertikal(
+        img, (0, 25, 15), dari="bawah",
+        alpha_maks=230, alpha_min=0
+    )
     draw = ImageDraw.Draw(img)
 
-    # Bar hijau atas & bawah
-    draw.rectangle([0, 0,  W, 10], fill=(0, 220, 100))
-    draw.rectangle([0, H-10, W, H], fill=(0, 220, 100))
+    st    = info["status"]
+    harga = f"{info['harga_sekarang']:,}".replace(",", ".")
+    tgl   = datetime.now().strftime("%d %B %Y")
+    sel   = _rp(info["selisih"])
 
-    # Badge status
-    _label_status(draw, fp, info, 30, 20)
+    # ── Bar hijau muda atas ──
+    draw.rectangle([0, 0, W, 12], fill=(140, 255, 180))
 
-    # Harga
-    _harga_box(draw, fp, info, 30, 90,
-               warna_harga=(100, 255, 160),
-               warna_sub=(200, 255, 220))
+    # ── Nama channel pojok kiri atas ──
+    draw_text_stroke(draw, 30, 24,
+                     NAMA_CHANNEL,
+                     get_font(fp, 28),
+                     (180, 255, 200),
+                     stroke=3, stroke_fill=(0, 40, 20))
 
-    # Judul
-    _judul_multiline(draw, fp, judul, 30, 300,
-                     w=24, warna=(240, 255, 240))
+    # ── Tanggal pojok kanan atas ──
+    draw_text_stroke(draw, W - 30, 24,
+                     tgl, get_font(fp, 26),
+                     (180, 255, 200),
+                     stroke=2, stroke_fill=(0, 0, 0),
+                     anchor="rt")
 
-    # Historis kanan
-    _historis_panel(draw, fp, info,
-                    x=W//2+90, y=20,
-                    warna_judul=(100, 255, 160))
+    # ── Harga BESAR CENTER ──
+    draw_text_stroke(draw, W // 2, H - 200,
+                     f"Rp {harga}",
+                     get_font(fp, 110),
+                     (200, 255, 210),
+                     stroke=7, stroke_fill=(0, 50, 25),
+                     anchor="mt")
 
-    _watermark(draw, fp)
+    draw_text_stroke(draw, W // 2, H - 82,
+                     "per gram · Antam",
+                     get_font(fp, 34),
+                     (160, 240, 180),
+                     stroke=3, stroke_fill=(0, 0, 0),
+                     anchor="mt")
+
+    # ── Badge status center bawah ──
+    if st == "Naik":
+        bg_badge = (160, 255, 190)
+        tc_badge = (0, 60, 20)
+        icon     = f"▲ NAIK  {sel}"
+    elif st == "Turun":
+        bg_badge = (200, 255, 200)
+        tc_badge = (0, 80, 30)
+        icon     = f"▼ TURUN  {sel}"
+    else:
+        bg_badge = (220, 255, 220)
+        tc_badge = (20, 80, 20)
+        icon     = "= STABIL"
+
+    bw  = len(icon) * 18 + 60
+    bx  = W // 2 - bw // 2
+    draw_rounded_rect(draw, bx, H - 44, bx + bw, H - 6,
+                      18, fill=bg_badge)
+    draw.text((bx + 20, H - 40), icon,
+              font=get_font(fp, 28), fill=tc_badge)
+
+    # ── Bar hijau muda bawah ──
+    draw.rectangle([0, H - 6, W, H], fill=(140, 255, 180))
+
     img.save(output_path, "JPEG", quality=96)
     log(f"  -> ✅ T3 saved: {output_path}")
     return output_path
 
 
 # ════════════════════════════════════════════════════════════
-# TEMPLATE 4 — Neon Ungu | Channel 4: Harga Emas Live
-# Foto vivid + efek neon + badge LIVE merah
+# TEMPLATE 4 — Channel 4: Harga Emas Live
+# Warna muda: Ungu Muda & Lavender Pastel
+# Letak teks: KIRI ATAS
+# Gaya: Live broadcast style, badge LIVE merah muda
 # ════════════════════════════════════════════════════════════
 
 def _tmpl_ch4(info, judul, output_path):
-    from PIL import Image, ImageDraw, ImageFilter
-    fp  = _fp()
+    from PIL import Image, ImageDraw
+    fp = _fp()
 
-    # Foto vivid
-    img  = _foto_bg(brightness=0.8, blur=2)
-    img  = _overlay_warna(img, (30, 0, 60), 140)
-    img  = _overlay_gradient(img, (20, 0, 50),
-                              dari="kiri",
-                              alpha_maks=200, alpha_min=10)
+    img  = _foto_bg(brightness=0.9, blur=2)
+    # Gradient kiri ungu muda
+    img  = _overlay_gradient(
+        img, (40, 0, 80), dari="kiri",
+        alpha_maks=210, alpha_min=10
+    )
     draw = ImageDraw.Draw(img)
 
-    # Neon border
-    for i in range(5):
-        col = (180, 0, 255) if i % 2 == 0 else (255, 80, 255)
-        draw.rectangle([i, i, W-1-i, H-1-i],
-                        outline=col, width=1)
+    st    = info["status"]
+    harga = f"{info['harga_sekarang']:,}".replace(",", ".")
+    tgl   = datetime.now().strftime("%d %B %Y")
+    sel   = _rp(info["selisih"])
 
-    # Badge LIVE
-    draw_rounded_rect(draw, W-130, 20, W-20, 72,
-                       12, fill=(200, 0, 0))
-    draw.text((W-116, 28), "● LIVE",
-              font=get_font(fp, 30),
-              fill=(255, 255, 255))
+    # ── Badge LIVE kiri atas ──
+    draw_rounded_rect(draw, 28, 22, 168, 74, 20,
+                      fill=(255, 180, 220))   # pink muda
+    draw.text((44, 28), "● LIVE",
+              font=get_font(fp, 32),
+              fill=(120, 0, 60))
 
-    # Badge status
-    _label_status(draw, fp, info, 28, 20)
+    # ── Nama channel kanan atas ──
+    draw_text_stroke(draw, W - 30, 28,
+                     NAMA_CHANNEL,
+                     get_font(fp, 26),
+                     (220, 190, 255),
+                     stroke=3, stroke_fill=(40, 0, 80),
+                     anchor="rt")
 
-    # Harga dengan glow
-    harga = f"{info['harga_sekarang']:,}".replace(",",".")
-    for off in [(0,4),(0,-4),(4,0),(-4,0)]:
-        draw.text((28+off[0], 96+off[1]),
-                  "Rp " + harga,
-                  font=get_font(fp, 88),
-                  fill=(200, 0, 255, 60))
-    draw_text_stroke(draw, 28, 52, "Rp",
-                      get_font(fp, 40),
-                      (220, 180, 255), stroke=2,
-                      stroke_fill=(0,0,0))
-    draw_text_stroke(draw, 28, 96, harga,
-                      get_font(fp, 88),
-                      (255, 220, 255), stroke=4,
-                      stroke_fill=(80, 0, 120))
-    draw_text_stroke(draw, 30, 196, "per gram · Antam",
-                      get_font(fp, 28),
-                      (220, 180, 255), stroke=2,
-                      stroke_fill=(0,0,0))
+    # ── Harga besar kiri ──
+    draw_text_stroke(draw, 30, 96,
+                     "Harga Emas",
+                     get_font(fp, 32),
+                     (210, 190, 255),
+                     stroke=2, stroke_fill=(0, 0, 0))
+    draw_text_stroke(draw, 28, 130,
+                     f"Rp {harga}",
+                     get_font(fp, 96),
+                     (230, 210, 255),
+                     stroke=6, stroke_fill=(50, 0, 100))
+    draw_text_stroke(draw, 30, 238,
+                     "per gram · Antam",
+                     get_font(fp, 30),
+                     (200, 180, 255),
+                     stroke=2, stroke_fill=(0, 0, 0))
 
-    # Badge selisih
-    sel  = info["selisih"]
-    st   = info["status"]
-    if sel > 0:
-        sc   = (80,255,120) if st=="Naik" else (255,80,80)
-        ar   = "▲" if st=="Naik" else "▼"
-        draw_rounded_rect(draw, 28, 240, 340, 290,
-                           20, fill=(0,0,0,180))
-        draw_text_stroke(draw, 46, 246,
-                          f"{ar} {_rp(sel)}",
-                          get_font(fp, 30), sc,
-                          stroke=2, stroke_fill=(0,0,0))
+    # ── Badge status kiri ──
+    if st == "Naik":
+        bg_badge = (220, 200, 255)
+        tc_badge = (60, 0, 120)
+        icon     = f"▲ NAIK  {sel}"
+    elif st == "Turun":
+        bg_badge = (200, 180, 255)
+        tc_badge = (50, 0, 100)
+        icon     = f"▼ TURUN  {sel}"
+    else:
+        bg_badge = (230, 215, 255)
+        tc_badge = (60, 20, 100)
+        icon     = "= STABIL"
 
-    # Judul
-    _judul_multiline(draw, fp, judul, 28, 316,
-                     w=24, warna=(255, 230, 255))
+    bw = len(icon) * 18 + 50
+    draw_rounded_rect(draw, 28, 286, 28 + bw, 338, 20,
+                      fill=bg_badge)
+    draw.text((46, 292), icon,
+              font=get_font(fp, 30), fill=tc_badge)
 
-    # Historis kanan
-    _historis_panel(draw, fp, info,
-                    x=W//2+70, y=20,
-                    warna_judul=(220, 100, 255))
+    # ── Tanggal bawah kiri ──
+    draw_text_stroke(draw, 30, H - 44,
+                     tgl, get_font(fp, 26),
+                     (210, 190, 255),
+                     stroke=2, stroke_fill=(0, 0, 0))
 
-    _watermark(draw, fp)
+    # ── Border ungu muda ──
+    draw.rectangle([0, 0, W, 6], fill=(180, 140, 255))
+    draw.rectangle([0, H - 6, W, H], fill=(180, 140, 255))
+
     img.save(output_path, "JPEG", quality=96)
     log(f"  -> ✅ T4 saved: {output_path}")
     return output_path
 
 
 # ════════════════════════════════════════════════════════════
-# TEMPLATE 5 — Oranye Hangat | Channel 5: Cek Harga Emas
-# Foto full cerah + card oranye + teks putih besar
+# TEMPLATE 5 — Channel 5: Cek Harga Emas
+# Warna muda: Kuning Muda & Krem Pastel
+# Letak teks: TENGAH ATAS + TENGAH BAWAH (split)
+# Gaya: Friendly, card putih transparan di tengah
 # ════════════════════════════════════════════════════════════
 
 def _tmpl_ch5(info, judul, output_path):
     from PIL import Image, ImageDraw
-    fp  = _fp()
+    fp = _fp()
 
-    # Foto sangat cerah
-    img  = _foto_bg(brightness=1.0, blur=0)
-    img  = _overlay_gradient(img, (80, 30, 0),
-                              dari="kiri",
-                              alpha_maks=220, alpha_min=20)
+    img  = _foto_bg(brightness=0.88, blur=2)
+    # Overlay kuning muda ringan
+    img  = _overlay_warna(img, (60, 40, 0), 100)
     draw = ImageDraw.Draw(img)
 
-    # Card oranye semi-transparan kiri
-    card = Image.new("RGBA", (W//2+60, H),
-                     (200, 80, 0, 180))
+    st    = info["status"]
+    harga = f"{info['harga_sekarang']:,}".replace(",", ".")
+    tgl   = datetime.now().strftime("%d %B %Y")
+    sel   = _rp(info["selisih"])
+
+    # ── Card putih transparan tengah ──
+    card = Image.new("RGBA", (W - 100, 300),
+                     (255, 250, 220, 190))
     img  = Image.alpha_composite(
         img.convert("RGBA"), card
+    )
+    # Paste card di tengah vertikal
+    card_full = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    card_full.paste(card, (50, H // 2 - 150))
+    img = Image.alpha_composite(
+        img.convert("RGBA"), card_full
     ).convert("RGB")
     draw = ImageDraw.Draw(img)
 
-    # Stripe atas & bawah
-    draw.rectangle([0, 0, W, 12], fill=(255, 140, 0))
-    draw.rectangle([0, H-12, W, H], fill=(255, 140, 0))
+    # ── Nama channel tengah atas ──
+    draw_text_stroke(draw, W // 2, 24,
+                     NAMA_CHANNEL,
+                     get_font(fp, 30),
+                     (255, 240, 140),
+                     stroke=3, stroke_fill=(80, 50, 0),
+                     anchor="mt")
 
-    # Badge status
-    _label_status(draw, fp, info, 28, 18)
+    # ── Harga di dalam card (tengah) ──
+    draw_text_stroke(draw, W // 2, H // 2 - 130,
+                     "Harga Emas Antam Hari Ini",
+                     get_font(fp, 28),
+                     (100, 60, 0),
+                     stroke=1, stroke_fill=(200, 180, 100),
+                     anchor="mt")
+    draw_text_stroke(draw, W // 2, H // 2 - 96,
+                     f"Rp {harga}",
+                     get_font(fp, 100),
+                     (80, 50, 0),
+                     stroke=4, stroke_fill=(255, 220, 80),
+                     anchor="mt")
+    draw_text_stroke(draw, W // 2, H // 2 + 16,
+                     "per gram · Antam",
+                     get_font(fp, 30),
+                     (120, 80, 10),
+                     stroke=2, stroke_fill=(255, 230, 140),
+                     anchor="mt")
 
-    # Label
-    draw_text_stroke(draw, 28, 80,
-                      NAMA_CHANNEL.upper(),
-                      get_font(fp, 22),
-                      (255, 220, 100), stroke=2,
-                      stroke_fill=(80,30,0))
+    # ── Badge status di dalam card ──
+    if st == "Naik":
+        bg_badge = (200, 255, 180)
+        tc_badge = (0, 80, 10)
+        icon     = f"▲ NAIK  {sel}"
+    elif st == "Turun":
+        bg_badge = (255, 220, 160)
+        tc_badge = (100, 40, 0)
+        icon     = f"▼ TURUN  {sel}"
+    else:
+        bg_badge = (255, 245, 180)
+        tc_badge = (80, 60, 0)
+        icon     = "= STABIL"
 
-    # Harga
-    _harga_box(draw, fp, info, 28, 106,
-               warna_harga=(255, 240, 100),
-               warna_sub=(255, 220, 180))
+    bw  = len(icon) * 18 + 60
+    bx  = W // 2 - bw // 2
+    draw_rounded_rect(draw, bx, H // 2 + 58,
+                      bx + bw, H // 2 + 108, 20,
+                      fill=bg_badge)
+    draw.text((bx + 20, H // 2 + 64), icon,
+              font=get_font(fp, 30), fill=tc_badge)
 
-    # Garis pemisah
-    draw.line([(28, 310), (W//2+40, 310)],
-              fill=(255, 200, 80), width=3)
+    # ── Tanggal tengah bawah ──
+    draw_text_stroke(draw, W // 2, H - 38,
+                     tgl, get_font(fp, 28),
+                     (255, 235, 130),
+                     stroke=3, stroke_fill=(80, 50, 0),
+                     anchor="mt")
 
-    # Judul
-    _judul_multiline(draw, fp, judul, 28, 322,
-                     w=22, warna=(255, 255, 255))
+    # ── Strip kuning atas & bawah ──
+    draw.rectangle([0, 0, W, 8], fill=(255, 210, 60))
+    draw.rectangle([0, H - 8, W, H], fill=(255, 210, 60))
 
-    # Historis kanan (area foto)
-    _historis_panel(draw, fp, info,
-                    x=W//2+80, y=20,
-                    warna_judul=(255, 200, 80))
-
-    # Tanggal pojok kanan bawah
-    tgl = datetime.now().strftime("%d %B %Y")
-    draw_text_stroke(draw, W-260, H-48, tgl,
-                      get_font(fp, 24),
-                      (255, 220, 100), stroke=2,
-                      stroke_fill=(0,0,0))
-
-    _watermark(draw, fp, x=28)
     img.save(output_path, "JPEG", quality=96)
     log(f"  -> ✅ T5 saved: {output_path}")
     return output_path

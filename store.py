@@ -24,18 +24,20 @@ from utils import log
 BLACKLIST = [
     "bitcoin", "crypto", "cryptocurrency", "ethereum",
     "blockchain", "coin", "dollar", "forex", "stock",
-    "chart", "graph", "silver", "diamond", "money",
-    "cash", "banknote", "wallet", "credit", "market",
-    "trading", "exchange", "currency", "office",
-    "laptop", "phone", "computer", "person", "people",
-    "hand", "face", "man", "woman", "child", "piggy",
+    "chart", "graph", "silver",
+    "money", "cash", "banknote", "wallet", "credit",
+    "market", "trading", "exchange", "currency",
+    "office", "laptop", "phone", "computer",
+    "person", "people", "hand", "face",
+    "man", "woman", "child", "piggy",
 ]
 
 PIXABAY_KEYWORDS = [
     "gold bar", "gold bullion", "gold ingot",
-    "gold jewelry", "gold necklace", "gold bracelet",
-    "gold earrings", "gold ring luxury",
-    "gold bangle", "gold pendant",
+    "gold bar stack", "gold bar close up",
+    "pure gold bar", "gold bullion bar",
+    "gold ingot shiny", "gold bar investment",
+    "stacked gold bars",
 ]
 
 
@@ -63,7 +65,6 @@ def list_video_bank():
 def kelola_bank_gambar():
     os.makedirs(FOLDER_GAMBAR, exist_ok=True)
 
-    # Hapus semua gambar lama agar setiap run pakai gambar baru
     for f in list_gambar():
         try:
             os.remove(f)
@@ -75,11 +76,18 @@ def kelola_bank_gambar():
 
     ada = list_gambar()
 
-    # Fallback Pixabay jika Pexels gagal / kurang
     if len(ada) < 2:
         log(f"[STORAGE] Pexels kurang ({len(ada)}), coba Pixabay...")
         _download_gambar_pixabay(2 - len(ada))
         ada = list_gambar()
+
+    # Kalau masih cuma 1, duplikasi agar render tidak gagal
+    if len(ada) == 1:
+        import shutil
+        dst = ada[0].replace(".jpg", "_dup.jpg").replace(".jpeg", "_dup.jpeg").replace(".png", "_dup.png")
+        shutil.copy(ada[0], dst)
+        ada = list_gambar()
+        log(f"[STORAGE] Hanya 1 gambar tersedia, diduplikasi.")
 
     log(f"[STORAGE] Bank gambar siap: {len(ada)} gambar")
     return ada
@@ -92,16 +100,18 @@ def _download_gambar_pexels(jumlah):
 
     headers = {"Authorization": PEXELS_API_KEY}
 
-    # Pilih keyword unik secara random sebanyak jumlah yang dibutuhkan
-    kw_pool = random.sample(
-        KATA_KUNCI_GAMBAR,
-        min(jumlah, len(KATA_KUNCI_GAMBAR))
-    )
+    # Acak SEMUA keyword — coba satu per satu sampai dapat 'jumlah' gambar
+    # Ini fix utama: tidak berhenti di 2 keyword saja
+    kw_semua = KATA_KUNCI_GAMBAR.copy()
+    random.shuffle(kw_semua)
 
     ts    = int(time.time())
     total = 0
 
-    for kw in kw_pool:
+    for kw in kw_semua:
+        if total >= jumlah:
+            break
+
         try:
             resp = requests.get(
                 "https://api.pexels.com/v1/search",
@@ -117,6 +127,7 @@ def _download_gambar_pexels(jumlah):
             resp.raise_for_status()
             fotos = resp.json().get("photos", [])
 
+            dapat = False
             for i, foto in enumerate(fotos):
                 if (foto.get("width",  0) < 1200 or
                         foto.get("height", 0) < 800):
@@ -127,8 +138,8 @@ def _download_gambar_pexels(jumlah):
                     log(f"  -> [Pexels] Skip: {alt[:50]}")
                     continue
 
-                fn = (f"{FOLDER_GAMBAR}/px_{ts}_"
-                      f"{kw.replace(' ', '_')}_{i}.jpg")
+                fn = (f"{FOLDER_GAMBAR}/px_{ts}_{total+1}_"
+                      f"{kw.replace(' ', '_')[:20]}.jpg")
                 if os.path.exists(fn):
                     continue
 
@@ -139,14 +150,19 @@ def _download_gambar_pexels(jumlah):
                     with open(fn, "wb") as f:
                         f.write(data)
                     total += 1
+                    dapat = True
                     log(f"  -> ✅ [Pexels] [{kw}] "
                         f"{len(data)//1024}KB")
-                    break   # 1 gambar per keyword cukup
+                    break  # 1 gambar per keyword, lanjut keyword berikutnya
                 except Exception as e:
                     log(f"  -> [Pexels] Gagal download: {e}")
 
+            if not dapat:
+                log(f"  -> [Pexels] '{kw}': tidak ada foto relevan, coba keyword lain...")
+
         except Exception as e:
             log(f"  -> [Pexels] Error '{kw}': {e}")
+
         time.sleep(0.5)
 
     log(f"  -> [Pexels] Total: {total} gambar baru")
@@ -165,6 +181,8 @@ def _download_gambar_pixabay(jumlah):
     total = 0
 
     for kw in kw_pool:
+        if total >= jumlah:
+            break
         try:
             resp = requests.get(
                 "https://pixabay.com/api/",
@@ -193,8 +211,8 @@ def _download_gambar_pixabay(jumlah):
                     log(f"  -> [Pixabay] Skip: {tags[:40]}")
                     continue
 
-                fn = (f"{FOLDER_GAMBAR}/pbx_{ts}_"
-                      f"{kw.replace(' ', '_')}_{i}.jpg")
+                fn = (f"{FOLDER_GAMBAR}/pbx_{ts}_{total+1}_"
+                      f"{kw.replace(' ', '_')[:20]}.jpg")
                 if os.path.exists(fn):
                     continue
 
@@ -207,7 +225,7 @@ def _download_gambar_pixabay(jumlah):
                     total += 1
                     log(f"  -> ✅ [Pixabay] [{kw}] "
                         f"{len(data)//1024}KB — {tags[:35]}")
-                    break   # 1 gambar per keyword cukup
+                    break
                 except Exception as e:
                     log(f"  -> [Pixabay] Gagal: {e}")
 
@@ -321,7 +339,7 @@ def _download_video(jumlah):
 
 
 # ════════════════════════════════════════════════════════════
-# RESET
+# RESET & UTILITY
 # ════════════════════════════════════════════════════════════
 
 def reset_bank_gambar():

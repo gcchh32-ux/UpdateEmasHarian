@@ -7,6 +7,12 @@ from datetime import datetime
 from bs4 import BeautifulSoup
 from config import FILE_HISTORY
 from utils import log, rp
+_BULAN_ID = {
+    "January":"Januari",  "February":"Februari", "March":"Maret",
+    "April":"April",      "May":"Mei",            "June":"Juni",
+    "July":"Juli",        "August":"Agustus",     "September":"September",
+    "October":"Oktober",  "November":"November",  "December":"Desember",
+}
 
 HEADERS = {
     "User-Agent": (
@@ -300,7 +306,7 @@ def ambil_harga_emas():
         "selisih":        abs(selisih),
         "persen":         persen,
         "status":         status,
-        "tanggal":        now.strftime("%d %B %Y"),
+        "tanggal": f"{now.day} {_BULAN_ID[now.strftime('%B')]} {now.year}",
         "waktu":          now.strftime("%H:%M WIB"),
         "historis":       historis,
     }

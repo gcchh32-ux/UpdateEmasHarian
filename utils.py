@@ -8,7 +8,6 @@ def log(msg):
           flush=True)
 
 def rp(x):
-    """Format angka ke rupiah: 1650000 → Rp 1.650.000"""
     return f"Rp {x:,}".replace(",", ".")
 
 def font_path():
@@ -76,13 +75,38 @@ def draw_rounded_rect(draw, x1, y1, x2, y2, radius,
 
 def draw_text_stroke(draw, x, y, text, font,
                       fill, stroke=2,
-                      stroke_fill=(0, 0, 0)):
-    for dx in range(-stroke, stroke+1):
-        for dy in range(-stroke, stroke+1):
+                      stroke_fill=(0, 0, 0),
+                      anchor=None):
+    # Hitung ukuran teks untuk kalkulasi anchor
+    try:
+        bbox = font.getbbox(text)
+        tw   = bbox[2] - bbox[0]
+        th   = bbox[3] - bbox[1]
+    except:
+        tw, th = len(text) * 10, 20
+
+    # Sesuaikan posisi x,y berdasarkan anchor
+    if anchor == "rt":        # kanan atas
+        x = x - tw
+    elif anchor == "rb":      # kanan bawah
+        x = x - tw
+        y = y - th
+    elif anchor == "mt":      # tengah atas
+        x = x - tw // 2
+    elif anchor == "mb":      # tengah bawah
+        x = x - tw // 2
+        y = y - th
+    elif anchor == "lt" or anchor is None:
+        pass                  # kiri atas = default
+
+    # Gambar stroke (outline) dulu
+    for dx in range(-stroke, stroke + 1):
+        for dy in range(-stroke, stroke + 1):
             if dx == 0 and dy == 0:
                 continue
-            draw.text((x+dx, y+dy), text,
+            draw.text((x + dx, y + dy), text,
                       font=font, fill=stroke_fill)
+    # Gambar teks utama di atas stroke
     draw.text((x, y), text, font=font, fill=fill)
 
 def crop_center_resize(img, w, h):
@@ -93,11 +117,11 @@ def crop_center_resize(img, w, h):
     if ar_img > ar_target:
         new_w = int(ih * ar_target)
         left  = (iw - new_w) // 2
-        img   = img.crop((left, 0, left+new_w, ih))
+        img   = img.crop((left, 0, left + new_w, ih))
     else:
         new_h = int(iw / ar_target)
         top   = (ih - new_h) // 2
-        img   = img.crop((0, top, iw, top+new_h))
+        img   = img.crop((0, top, iw, top + new_h))
     return img.resize((w, h), Image.LANCZOS)
 
 def ffmpeg_duration(path):

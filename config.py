@@ -13,22 +13,22 @@ CHANNEL_CONFIG = {
         "gaya":        "formal_analitis",
         "skema_warna": "merah_emas",
         "keywords_img": [
+            "emas batang antam",
+            "emas batangan logam mulia",
             "gold bar antam indonesia",
             "gold bullion bar close up",
             "gold ingot stack shiny",
             "pure gold bar 999",
-            "gold jewelry ring bracelet",
-            "gold earrings necklace luxury",
-            "gold bangle accessories shiny",
             "antam logam mulia gold",
-            "emas batang antam",
-            "emas batangan logam mulia",
+            "gold bar investment shiny",
+            "gold bullion indonesia",
+            "stacked gold bars",
         ],
         "keywords_vid": [
             "gold bar shiny close up",
             "gold bullion bar",
             "pure gold ingot",
-            "gold jewelry luxury",
+            "gold bar investment",
         ],
     },
     2: {
@@ -39,22 +39,22 @@ CHANNEL_CONFIG = {
         "gaya":        "santai_edukatif",
         "skema_warna": "biru_perak",
         "keywords_img": [
+            "emas batang antam",
+            "emas batangan logam mulia",
             "gold bar stack close up",
             "gold bullion investment",
             "gold ingot pile shiny",
-            "gold necklace luxury close up",
-            "gold bracelet shiny jewelry",
-            "gold ring elegant close up",
-            "gold earrings fashion jewelry",
             "antam gold bar indonesia",
-            "emas batang antam",
-            "emas batangan logam mulia",
+            "pure gold bullion bar",
+            "gold bar shiny reflection",
+            "gold ingot close up",
+            "gold bullion stack",
         ],
         "keywords_vid": [
             "gold bar investment",
             "gold bullion close up",
-            "gold jewelry luxury",
             "gold ingot shiny",
+            "stacked gold bars",
         ],
     },
     3: {
@@ -65,22 +65,22 @@ CHANNEL_CONFIG = {
         "gaya":        "berita_singkat",
         "skema_warna": "hijau_platinum",
         "keywords_img": [
+            "emas batang antam",
+            "emas batangan logam mulia",
             "gold bar logam mulia",
             "gold bullion bar macro",
             "stacked gold ingot",
-            "gold necklace pendant luxury",
-            "gold bangles bracelets shiny",
-            "gold ring diamond jewelry",
             "pure gold bar reflection",
             "gold bar vault storage",
-            "emas batang antam",
-            "emas batangan logam mulia",
+            "gold bullion close up",
+            "gold ingot indonesia",
+            "antam gold bullion",
         ],
         "keywords_vid": [
             "gold bar vault",
             "stacked gold bullion",
-            "gold jewelry close up",
             "gold ingot macro",
+            "pure gold bar",
         ],
     },
     4: {
@@ -91,22 +91,22 @@ CHANNEL_CONFIG = {
         "gaya":        "energik_motivatif",
         "skema_warna": "ungu_mewah",
         "keywords_img": [
+            "emas batang antam",
+            "emas batangan logam mulia",
             "gold bar luxury close up",
             "shiny gold bullion bar",
             "gold ingot premium",
-            "gold necklace elegant luxury",
-            "gold earrings drop luxury",
-            "gold bracelet chain shiny",
             "gold bar collection",
             "antam gold bullion bar",
-            "emas batang antam",
-            "emas batangan logam mulia",
+            "gold bullion stack shiny",
+            "gold ingot pile",
+            "pure gold bar luxury",
         ],
         "keywords_vid": [
             "luxury gold bar",
             "shiny gold bullion",
-            "gold jewelry elegant",
             "premium gold ingot",
+            "gold bar stack",
         ],
     },
     5: {
@@ -117,38 +117,38 @@ CHANNEL_CONFIG = {
         "gaya":        "percakapan_akrab",
         "skema_warna": "oranye_tembaga",
         "keywords_img": [
-            "gold bar antam close up",
-            "gold bullion bar shiny",
-            "gold ring jewelry close up",
-            "gold necklace chain luxury",
-            "gold earrings stud shiny",
-            "gold bracelet bangle close",
-            "gold ingot stack macro",
-            "pure gold bar indonesia",
             "emas batang antam",
             "emas batangan logam mulia",
+            "gold bar antam close up",
+            "gold bullion bar shiny",
+            "gold ingot stack macro",
+            "pure gold bar indonesia",
+            "gold bullion indonesia",
+            "antam gold bar close",
+            "gold ingot shiny",
+            "gold bar pile",
         ],
         "keywords_vid": [
             "gold bar close up",
-            "gold jewelry luxury close",
             "gold bullion stack",
             "gold ingot indonesia",
+            "antam gold bar",
         ],
     },
 }
 
-CFG             = CHANNEL_CONFIG.get(CHANNEL_ID, CHANNEL_CONFIG[1])
-NAMA_CHANNEL    = CFG["nama"]
-SAPAAN          = CFG["sapaan"]
-VOICE           = CFG["voice"]
-VOICE_RATE      = CFG["rate"]
-NARASI_GAYA     = CFG["gaya"]
+CFG               = CHANNEL_CONFIG.get(CHANNEL_ID, CHANNEL_CONFIG[1])
+NAMA_CHANNEL      = CFG["nama"]
+SAPAAN            = CFG["sapaan"]
+VOICE             = CFG["voice"]
+VOICE_RATE        = CFG["rate"]
+NARASI_GAYA       = CFG["gaya"]
 KATA_KUNCI_GAMBAR = CFG["keywords_img"]
 KATA_KUNCI_VIDEO  = CFG["keywords_vid"]
 
-GEMINI_API_KEY  = os.environ.get("GEMINI_API_KEY",  "")
-PEXELS_API_KEY  = os.environ.get("PEXELS_API_KEY",  "")
-PIXABAY_API_KEY = os.environ.get("PIXABAY_API_KEY", "")
+GEMINI_API_KEY    = os.environ.get("GEMINI_API_KEY",  "")
+PEXELS_API_KEY    = os.environ.get("PEXELS_API_KEY",  "")
+PIXABAY_API_KEY   = os.environ.get("PIXABAY_API_KEY", "")
 
 YOUTUBE_CATEGORY = "25"
 YOUTUBE_TAGS = [
@@ -162,10 +162,10 @@ VIDEO_WIDTH  = 1920
 VIDEO_HEIGHT = 1080
 FPS          = 30
 
-FOLDER_GAMBAR      = "gambar_bank"
-FOLDER_VIDEO_BANK  = "video_bank"
+FOLDER_GAMBAR     = "gambar_bank"
+FOLDER_VIDEO_BANK = "video_bank"
 
-# Cukup 2 gambar per run — alternasi Ken Burns agar tidak terlihat sama
+# Cukup 2 gambar per run — alternasi Ken Burns
 JUMLAH_GAMBAR_MIN = 2
 JUMLAH_DL_GAMBAR  = 2
 
@@ -179,146 +179,146 @@ FILE_HISTORY = "history_harga.json"
 SKEMA_THUMBNAIL = {
     "merah_emas": {
         "Naik": {
-            "badge":       (200, 0, 0),
-            "aksen":       (255, 80, 0),
-            "teks":        (255, 220, 0),
-            "sub":         (255, 200, 150),
-            "hl_teks":     (255, 255, 255),
-            "icon":        "▲ NAIK",
+            "badge":        (200, 0, 0),
+            "aksen":        (255, 80, 0),
+            "teks":         (255, 220, 0),
+            "sub":          (255, 200, 150),
+            "hl_teks":      (255, 255, 255),
+            "icon":         "▲ NAIK",
             "bg_grad_atas": (60, 0, 0),
         },
         "Turun": {
-            "badge":       (0, 140, 50),
-            "aksen":       (0, 230, 80),
-            "teks":        (180, 255, 160),
-            "sub":         (200, 255, 200),
-            "hl_teks":     (255, 255, 255),
-            "icon":        "▼ TURUN",
+            "badge":        (0, 140, 50),
+            "aksen":        (0, 230, 80),
+            "teks":         (180, 255, 160),
+            "sub":          (200, 255, 200),
+            "hl_teks":      (255, 255, 255),
+            "icon":         "▼ TURUN",
             "bg_grad_atas": (0, 40, 10),
         },
         "Stabil": {
-            "badge":       (140, 100, 0),
-            "aksen":       (255, 190, 0),
-            "teks":        (255, 230, 100),
-            "sub":         (255, 240, 180),
-            "hl_teks":     (255, 255, 255),
-            "icon":        "= STABIL",
+            "badge":        (140, 100, 0),
+            "aksen":        (255, 190, 0),
+            "teks":         (255, 230, 100),
+            "sub":          (255, 240, 180),
+            "hl_teks":      (255, 255, 255),
+            "icon":         "= STABIL",
             "bg_grad_atas": (40, 30, 0),
         },
     },
     "biru_perak": {
         "Naik": {
-            "badge":       (0, 60, 180),
-            "aksen":       (0, 160, 255),
-            "teks":        (150, 220, 255),
-            "sub":         (200, 230, 255),
-            "hl_teks":     (255, 255, 255),
-            "icon":        "▲ NAIK",
+            "badge":        (0, 60, 180),
+            "aksen":        (0, 160, 255),
+            "teks":         (150, 220, 255),
+            "sub":          (200, 230, 255),
+            "hl_teks":      (255, 255, 255),
+            "icon":         "▲ NAIK",
             "bg_grad_atas": (0, 20, 60),
         },
         "Turun": {
-            "badge":       (0, 120, 160),
-            "aksen":       (0, 220, 200),
-            "teks":        (180, 255, 250),
-            "sub":         (200, 255, 255),
-            "hl_teks":     (255, 255, 255),
-            "icon":        "▼ TURUN",
+            "badge":        (0, 120, 160),
+            "aksen":        (0, 220, 200),
+            "teks":         (180, 255, 250),
+            "sub":          (200, 255, 255),
+            "hl_teks":      (255, 255, 255),
+            "icon":         "▼ TURUN",
             "bg_grad_atas": (0, 35, 45),
         },
         "Stabil": {
-            "badge":       (80, 80, 160),
-            "aksen":       (160, 160, 255),
-            "teks":        (200, 200, 255),
-            "sub":         (220, 220, 255),
-            "hl_teks":     (255, 255, 255),
-            "icon":        "= STABIL",
+            "badge":        (80, 80, 160),
+            "aksen":        (160, 160, 255),
+            "teks":         (200, 200, 255),
+            "sub":          (220, 220, 255),
+            "hl_teks":      (255, 255, 255),
+            "icon":         "= STABIL",
             "bg_grad_atas": (20, 20, 50),
         },
     },
     "hijau_platinum": {
         "Naik": {
-            "badge":       (0, 130, 60),
-            "aksen":       (0, 230, 100),
-            "teks":        (200, 255, 200),
-            "sub":         (220, 255, 220),
-            "hl_teks":     (0, 50, 0),
-            "icon":        "▲ NAIK",
+            "badge":        (0, 130, 60),
+            "aksen":        (0, 230, 100),
+            "teks":         (200, 255, 200),
+            "sub":          (220, 255, 220),
+            "hl_teks":      (0, 50, 0),
+            "icon":         "▲ NAIK",
             "bg_grad_atas": (0, 40, 15),
         },
         "Turun": {
-            "badge":       (180, 140, 0),
-            "aksen":       (255, 210, 0),
-            "teks":        (255, 240, 150),
-            "sub":         (255, 245, 180),
-            "hl_teks":     (50, 30, 0),
-            "icon":        "▼ TURUN",
+            "badge":        (180, 140, 0),
+            "aksen":        (255, 210, 0),
+            "teks":         (255, 240, 150),
+            "sub":          (255, 245, 180),
+            "hl_teks":      (50, 30, 0),
+            "icon":         "▼ TURUN",
             "bg_grad_atas": (50, 40, 0),
         },
         "Stabil": {
-            "badge":       (60, 120, 60),
-            "aksen":       (150, 255, 150),
-            "teks":        (220, 255, 220),
-            "sub":         (230, 255, 230),
-            "hl_teks":     (0, 50, 0),
-            "icon":        "= STABIL",
+            "badge":        (60, 120, 60),
+            "aksen":        (150, 255, 150),
+            "teks":         (220, 255, 220),
+            "sub":          (230, 255, 230),
+            "hl_teks":      (0, 50, 0),
+            "icon":         "= STABIL",
             "bg_grad_atas": (15, 35, 15),
         },
     },
     "ungu_mewah": {
         "Naik": {
-            "badge":       (120, 0, 180),
-            "aksen":       (220, 0, 255),
-            "teks":        (255, 180, 255),
-            "sub":         (240, 200, 255),
-            "hl_teks":     (255, 255, 255),
-            "icon":        "▲ NAIK",
+            "badge":        (120, 0, 180),
+            "aksen":        (220, 0, 255),
+            "teks":         (255, 180, 255),
+            "sub":          (240, 200, 255),
+            "hl_teks":      (255, 255, 255),
+            "icon":         "▲ NAIK",
             "bg_grad_atas": (40, 0, 60),
         },
         "Turun": {
-            "badge":       (80, 0, 140),
-            "aksen":       (180, 100, 255),
-            "teks":        (230, 200, 255),
-            "sub":         (240, 220, 255),
-            "hl_teks":     (255, 255, 255),
-            "icon":        "▼ TURUN",
+            "badge":        (80, 0, 140),
+            "aksen":        (180, 100, 255),
+            "teks":         (230, 200, 255),
+            "sub":          (240, 220, 255),
+            "hl_teks":      (255, 255, 255),
+            "icon":         "▼ TURUN",
             "bg_grad_atas": (25, 0, 45),
         },
         "Stabil": {
-            "badge":       (100, 50, 150),
-            "aksen":       (200, 150, 255),
-            "teks":        (240, 220, 255),
-            "sub":         (245, 230, 255),
-            "hl_teks":     (255, 255, 255),
-            "icon":        "= STABIL",
+            "badge":        (100, 50, 150),
+            "aksen":        (200, 150, 255),
+            "teks":         (240, 220, 255),
+            "sub":          (245, 230, 255),
+            "hl_teks":      (255, 255, 255),
+            "icon":         "= STABIL",
             "bg_grad_atas": (30, 15, 50),
         },
     },
     "oranye_tembaga": {
         "Naik": {
-            "badge":       (200, 80, 0),
-            "aksen":       (255, 140, 0),
-            "teks":        (255, 210, 100),
-            "sub":         (255, 225, 150),
-            "hl_teks":     (50, 20, 0),
-            "icon":        "▲ NAIK",
+            "badge":        (200, 80, 0),
+            "aksen":        (255, 140, 0),
+            "teks":         (255, 210, 100),
+            "sub":          (255, 225, 150),
+            "hl_teks":      (50, 20, 0),
+            "icon":         "▲ NAIK",
             "bg_grad_atas": (60, 25, 0),
         },
         "Turun": {
-            "badge":       (160, 60, 0),
-            "aksen":       (255, 100, 0),
-            "teks":        (255, 180, 100),
-            "sub":         (255, 200, 150),
-            "hl_teks":     (50, 15, 0),
-            "icon":        "▼ TURUN",
+            "badge":        (160, 60, 0),
+            "aksen":        (255, 100, 0),
+            "teks":         (255, 180, 100),
+            "sub":          (255, 200, 150),
+            "hl_teks":      (50, 15, 0),
+            "icon":         "▼ TURUN",
             "bg_grad_atas": (50, 20, 0),
         },
         "Stabil": {
-            "badge":       (180, 100, 0),
-            "aksen":       (255, 160, 50),
-            "teks":        (255, 220, 150),
-            "sub":         (255, 235, 180),
-            "hl_teks":     (50, 25, 0),
-            "icon":        "= STABIL",
+            "badge":        (180, 100, 0),
+            "aksen":        (255, 160, 50),
+            "teks":         (255, 220, 150),
+            "sub":          (255, 235, 180),
+            "hl_teks":      (50, 25, 0),
+            "icon":         "= STABIL",
             "bg_grad_atas": (55, 30, 0),
         },
     },
@@ -334,5 +334,5 @@ def log(msg):
     from datetime import datetime
     print(
         f"[{datetime.now().strftime('%H:%M:%S')}] {msg}",
-        flush=True
+        flush=True,
     )

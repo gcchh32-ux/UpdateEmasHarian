@@ -166,8 +166,8 @@ FOLDER_GAMBAR     = "gambar_bank"
 FOLDER_VIDEO_BANK = "video_bank"
 
 # Cukup 2 gambar per run — alternasi Ken Burns
-JUMLAH_GAMBAR_MIN = 2
-JUMLAH_DL_GAMBAR  = 2
+JUMLAH_GAMBAR_MIN = 10
+JUMLAH_DL_GAMBAR  = 20
 
 JUMLAH_VIDEO_MIN  = 4
 JUMLAH_DL_VIDEO   = 8

@@ -10,6 +10,30 @@ from utils import log, rp
 
 import os
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
+_BULAN_ID = {
+    "January":"Januari","February":"Februari","March":"Maret",
+    "April":"April","May":"Mei","June":"Juni","July":"Juli",
+    "August":"Agustus","September":"September","October":"Oktober",
+    "November":"November","December":"Desember",
+}
+
+def _tgl_id(x):
+    import re
+    x = str(x).strip()
+    m = re.match(r"(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})", x)
+    if m:
+        d,b,y = m.groups()
+        return f"{int(d)} {_BULAN_ID.get(b.capitalize(),b)} {y}"
+    m2 = re.match(r"(\d{4})-(\d{2})-(\d{2})", x)
+    if m2:
+        y,mo,d = m2.groups()
+        try:
+            from datetime import date as _d
+            dt=_d(int(y),int(mo),int(d))
+            b=dt.strftime("%B")
+            return f"{int(d)} {_BULAN_ID.get(b,b)} {y}"
+        except: pass
+    return x
 
 GEMINI_MODELS = [
     "gemini-2.0-flash",
@@ -39,7 +63,7 @@ def _build_prompt(info):
     selisih = rp(info["selisih"])
     status  = info["status"]
     persen  = f"{info['persen']:.2f}%"
-    tgl     = info["tanggal"]
+    tgl    = _tgl_id(info["tanggal"])
     waktu   = info["waktu"]
 
     hist_txt = ""

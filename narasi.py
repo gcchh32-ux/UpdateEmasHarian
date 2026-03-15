@@ -10,29 +10,30 @@ from utils import log, rp
 
 import os
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
+
 _BULAN_ID = {
-    "January":"Januari","February":"Februari","March":"Maret",
-    "April":"April","May":"Mei","June":"Juni","July":"Juli",
-    "August":"Agustus","September":"September","October":"Oktober",
-    "November":"November","December":"Desember",
+    "January":"Januari",  "February":"Februari", "March":"Maret",
+    "April":"April",      "May":"Mei",            "June":"Juni",
+    "July":"Juli",        "August":"Agustus",     "September":"September",
+    "October":"Oktober",  "November":"November",  "December":"Desember",
 }
 
 def _tgl_id(x):
-    import re
     x = str(x).strip()
     m = re.match(r"(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})", x)
     if m:
-        d,b,y = m.groups()
-        return f"{int(d)} {_BULAN_ID.get(b.capitalize(),b)} {y}"
+        d, b, y = m.groups()
+        return f"{int(d)} {_BULAN_ID.get(b.capitalize(), b)} {y}"
     m2 = re.match(r"(\d{4})-(\d{2})-(\d{2})", x)
     if m2:
-        y,mo,d = m2.groups()
+        y, mo, d = m2.groups()
         try:
             from datetime import date as _d
-            dt=_d(int(y),int(mo),int(d))
-            b=dt.strftime("%B")
-            return f"{int(d)} {_BULAN_ID.get(b,b)} {y}"
-        except: pass
+            dt = _d(int(y), int(mo), int(d))
+            b = dt.strftime("%B")
+            return f"{int(d)} {_BULAN_ID.get(b, b)} {y}"
+        except:
+            pass
     return x
 
 GEMINI_MODELS = [
@@ -53,6 +54,7 @@ OPENROUTER_MODELS = [
     "mistralai/mistral-7b-instruct:free",
 ]
 
+
 # ════════════════════════════════════════════════════════════
 # PROMPT
 # ════════════════════════════════════════════════════════════
@@ -63,11 +65,11 @@ def _build_prompt(info):
     selisih = rp(info["selisih"])
     status  = info["status"]
     persen  = f"{info['persen']:.2f}%"
-    tgl    = _tgl_id(info["tanggal"])
+    tgl     = _tgl_id(info["tanggal"])
     waktu   = info["waktu"]
 
     hist_txt = ""
-    lbl_map  = [
+    lbl_map = [
         ("kemarin", "kemarin"),
         ("7_hari",  "7 hari lalu"),
         ("1_bulan", "1 bulan lalu"),
@@ -78,8 +80,8 @@ def _build_prompt(info):
     for key, label in lbl_map:
         d = info["historis"].get(key)
         if d:
-            ar = "naik"  if d["naik"]       else \
-                 "turun" if not d["stabil"]  else \
+            ar = "naik"  if d["naik"]      else \
+                 "turun" if not d["stabil"] else \
                  "stabil"
             hist_txt += (
                 f"- {label}: {ar} "
@@ -111,43 +113,40 @@ def _build_prompt(info):
             "ngobrol dengan teman. Santai dan natural."
         ),
     }
-    gaya_instruksi = gaya_map.get(
-        NARASI_GAYA, gaya_map["santai_edukatif"]
+    gaya_instruksi = gaya_map.get(NARASI_GAYA, gaya_map["santai_edukatif"])
+
+    # PENTING: tutup string dengan ''' bukan """ agar aman
+    return (
+        f'Kamu adalah narrator video YouTube channel "{NAMA_CHANNEL}".\n'
+        f"{gaya_instruksi}\n\n"
+        f"DATA HARGA EMAS ANTAM HARI INI:\n"
+        f"- Tanggal     : {tgl}\n"
+        f"- Waktu update: {waktu}\n"
+        f"- Harga/gram  : {harga}\n"
+        f"- Kemarin     : {kemarin}\n"
+        f"- Perubahan   : {status} {persen} ({selisih})\n\n"
+        f"HISTORIS PERUBAHAN:\n"
+        f"{hist_txt if hist_txt else '- Belum ada data historis'}\n\n"
+        f"TUGAS:\n"
+        f"1. Buat JUDUL video menarik (maksimal 80 karakter)\n"
+        f"2. Buat NARASI video berdurasi 5-7 menit (750-1000 kata)\n\n"
+        f"FORMAT OUTPUT (WAJIB IKUTI PERSIS):\n"
+        f"JUDUL: [judul video di sini]\n"
+        f"NARASI:\n"
+        f"[narasi lengkap di sini]\n\n"
+        f"ATURAN NARASI:\n"
+        f'- Kalimat pertama WAJIB: "Halo {SAPAAN},"\n'
+        f"- Sebutkan harga, status naik/turun/stabil, selisihnya\n"
+        f"- Bahas historis perubahan harga (minimal 3 periode)\n"
+        f"- Berikan tips/insight investasi emas yang relevan\n"
+        f"- Tutup dengan ajakan subscribe dan like\n"
+        f"- JANGAN gunakan emoji, simbol, atau karakter khusus\n"
+        f"- JANGAN gunakan tanda bintang atau markdown\n"
+        f"- Tulis angka dalam kata: satu juta enam ratus ribu rupiah\n"
+        f"- Natural saat dibaca/didengar (text-to-speech)\n"
+        f"- WAJIB minimal 750 kata, minimal 5 menit saat dibacakan, jangan singkat\n"
     )
 
-    return f"""Kamu adalah narrator video YouTube channel "{NAMA_CHANNEL}".
-{gaya_instruksi}
-
-DATA HARGA EMAS ANTAM HARI INI:
-- Tanggal     : {tgl}
-- Waktu update: {waktu}
-- Harga/gram  : {harga}
-- Kemarin     : {kemarin}
-- Perubahan   : {status} {persen} ({selisih})
-
-HISTORIS PERUBAHAN:
-{hist_txt if hist_txt else "- Belum ada data historis"}
-
-TUGAS:
-1. Buat JUDUL video menarik (maksimal 80 karakter)
-2. Buat NARASI video berdurasi 5-7 menit (750-1000 kata)
-
-FORMAT OUTPUT (WAJIB IKUTI PERSIS):
-JUDUL: [judul video di sini]
-NARASI:
-[narasi lengkap di sini]
-
-ATURAN NARASI:
-- Kalimat pertama WAJIB: "Halo {SAPAAN},"
-- Sebutkan harga, status naik/turun/stabil, selisihnya
-- Bahas historis perubahan harga (minimal 3 periode)
-- Berikan tips/insight investasi emas yang relevan
-- Tutup dengan ajakan subscribe dan like
-- JANGAN gunakan emoji, simbol, atau karakter khusus
-- JANGAN gunakan tanda bintang atau markdown
-- Tulis angka dalam kata: satu juta enam ratus ribu rupiah
-- Natural saat dibaca/didengar (text-to-speech)
-- WAJIB minimal 750 kata, minimal 5 menit saat dibacakan, jangan singkat
 
 # ════════════════════════════════════════════════════════════
 # CALL GEMINI
@@ -162,15 +161,12 @@ def _call_gemini(prompt):
         url = GEMINI_BASE.format(model=model)
         for attempt in range(1, 4):
             try:
-                log(f"  -> Gemini [{model}] "
-                    f"attempt {attempt}/3...")
+                log(f"  -> Gemini [{model}] attempt {attempt}/3...")
                 resp = requests.post(
                     url,
                     params={"key": GEMINI_API_KEY},
                     json={
-                        "contents": [{
-                            "parts": [{"text": prompt}]
-                        }],
+                        "contents": [{"parts": [{"text": prompt}]}],
                         "generationConfig": {
                             "temperature":     0.8,
                             "maxOutputTokens": 3000,
@@ -181,8 +177,7 @@ def _call_gemini(prompt):
                 )
                 if resp.status_code == 429:
                     wait = attempt * 20
-                    log(f"  -> Rate limit 429, "
-                        f"tunggu {wait}s...")
+                    log(f"  -> Rate limit 429, tunggu {wait}s...")
                     time.sleep(wait)
                     continue
                 if resp.status_code == 503:
@@ -192,9 +187,7 @@ def _call_gemini(prompt):
                     continue
                 resp.raise_for_status()
                 data = resp.json()
-                text = (data["candidates"][0]
-                            ["content"]["parts"][0]
-                            ["text"])
+                text = (data["candidates"][0]["content"]["parts"][0]["text"])
                 log(f"  -> Gemini [{model}] OK!")
                 return text
             except requests.exceptions.HTTPError as e:
@@ -211,6 +204,7 @@ def _call_gemini(prompt):
     log("  -> Semua model Gemini gagal")
     return None
 
+
 # ════════════════════════════════════════════════════════════
 # CALL OPENROUTER
 # ════════════════════════════════════════════════════════════
@@ -223,45 +217,36 @@ def _call_openrouter(prompt):
     for model in OPENROUTER_MODELS:
         for attempt in range(1, 3):
             try:
-                log(f"  -> OpenRouter [{model}] "
-                    f"attempt {attempt}/2...")
+                log(f"  -> OpenRouter [{model}] attempt {attempt}/2...")
                 resp = requests.post(
                     "https://openrouter.ai/api/v1/chat/completions",
                     headers={
-                        "Authorization":
-                            f"Bearer {OPENROUTER_API_KEY}",
-                        "Content-Type": "application/json",
-                        "HTTP-Referer": "https://github.com",
-                        "X-Title": NAMA_CHANNEL,
+                        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                        "Content-Type":  "application/json",
+                        "HTTP-Referer":  "https://github.com",
+                        "X-Title":       NAMA_CHANNEL,
                     },
                     json={
-                        "model": model,
-                        "messages": [{
-                            "role":    "user",
-                            "content": prompt,
-                        }],
-                        "max_tokens":  1500,
+                        "model":       model,
+                        "messages":    [{"role": "user", "content": prompt}],
+                        "max_tokens":  3000,
                         "temperature": 0.8,
                     },
                     timeout=60,
                 )
                 if resp.status_code == 429:
                     wait = attempt * 15
-                    log(f"  -> Rate limit 429, "
-                        f"tunggu {wait}s...")
+                    log(f"  -> Rate limit 429, tunggu {wait}s...")
                     time.sleep(wait)
                     continue
                 if resp.status_code in (500, 502, 503):
                     wait = attempt * 10
-                    log(f"  -> Server error "
-                        f"{resp.status_code}, "
-                        f"tunggu {wait}s...")
+                    log(f"  -> Server error {resp.status_code}, tunggu {wait}s...")
                     time.sleep(wait)
                     continue
                 resp.raise_for_status()
                 data = resp.json()
-                text = (data["choices"][0]
-                            ["message"]["content"])
+                text = data["choices"][0]["message"]["content"]
                 if text and len(text.strip()) > 100:
                     log(f"  -> OpenRouter [{model}] OK!")
                     return text
@@ -280,6 +265,7 @@ def _call_openrouter(prompt):
 
     log("  -> Semua model OpenRouter gagal")
     return None
+
 
 # ════════════════════════════════════════════════════════════
 # PARSE OUTPUT
@@ -329,14 +315,12 @@ def _parse_output(raw):
     ).strip()
     return judul, narasi_bersih
 
+
 # ════════════════════════════════════════════════════════════
-# FALLBACK TEMPLATES — POOL PER CHANNEL
-# Setiap channel punya 5 variasi opening, 5 tren, 5 tips,
-# 5 historis, 5 penutup, dan 5 judul — dipilih random.
+# FALLBACK TEMPLATES
 # ════════════════════════════════════════════════════════════
 
-def _pool_ch1(info, harga, kemarin, selisih, persen,
-              status, tgl, hist):
+def _pool_ch1(info, harga, kemarin, selisih, persen, status, tgl, hist):
     """Channel 1: Sobat Antam - formal analitis"""
     openings = [
         f"Halo {SAPAAN}, selamat datang kembali di channel {NAMA_CHANNEL}. Pada kesempatan hari ini, {tgl}, kami hadir membawa analisis lengkap pergerakan harga emas Antam yang perlu Anda cermati sebelum mengambil keputusan investasi.",
@@ -394,11 +378,11 @@ def _pool_ch1(info, harga, kemarin, selisih, persen,
         f"Harga Emas {status} {persen} - {tgl} | Data & Analisis Terkini",
         f"Emas Antam {tgl}: {harga} per Gram | Tren {status}",
     ]
-    return openings, (tren_naik if status=="naik" else tren_turun if status=="turun" else tren_stabil), tips, historis_list, penutup, judul_list
+    trens = tren_naik if status == "naik" else tren_turun if status == "turun" else tren_stabil
+    return openings, trens, tips, historis_list, penutup, judul_list
 
 
-def _pool_ch2(info, harga, kemarin, selisih, persen,
-              status, tgl, hist):
+def _pool_ch2(info, harga, kemarin, selisih, persen, status, tgl, hist):
     """Channel 2: Update Emas Harian - santai edukatif"""
     openings = [
         f"Halo {SAPAAN}, selamat datang lagi di channel {NAMA_CHANNEL}. Yuk kita bahas bareng-bareng harga emas Antam hari ini, {tgl}, biar kamu makin pinter soal investasi emas.",
@@ -456,11 +440,11 @@ def _pool_ch2(info, harga, kemarin, selisih, persen,
         f"Cek Harga Emas Antam {tgl} | Update Harian",
         f"Emas Naik atau Turun? Update {tgl} | {NAMA_CHANNEL}",
     ]
-    return openings, (tren_naik if status=="naik" else tren_turun if status=="turun" else tren_stabil), tips, historis_list, penutup, judul_list
+    trens = tren_naik if status == "naik" else tren_turun if status == "turun" else tren_stabil
+    return openings, trens, tips, historis_list, penutup, judul_list
 
 
-def _pool_ch3(info, harga, kemarin, selisih, persen,
-              status, tgl, hist):
+def _pool_ch3(info, harga, kemarin, selisih, persen, status, tgl, hist):
     """Channel 3: Info Logam Mulia - berita singkat"""
     openings = [
         f"Halo {SAPAAN}, selamat menyaksikan Info Logam Mulia bersama channel {NAMA_CHANNEL}. Inilah laporan harga emas Antam terkini untuk hari ini, {tgl}.",
@@ -518,11 +502,11 @@ def _pool_ch3(info, harga, kemarin, selisih, persen,
         f"Update Harga Emas {tgl} | {harga} per Gram | Antam",
         f"Emas Antam {tgl}: {harga} | {status.title()} {persen}",
     ]
-    return openings, (tren_naik if status=="naik" else tren_turun if status=="turun" else tren_stabil), tips, historis_list, penutup, judul_list
+    trens = tren_naik if status == "naik" else tren_turun if status == "turun" else tren_stabil
+    return openings, trens, tips, historis_list, penutup, judul_list
 
 
-def _pool_ch4(info, harga, kemarin, selisih, persen,
-              status, tgl, hist):
+def _pool_ch4(info, harga, kemarin, selisih, persen, status, tgl, hist):
     """Channel 4: Harga Emas Live - energik motivatif"""
     openings = [
         f"Halo {SAPAAN}! Selamat datang di channel {NAMA_CHANNEL}, channel paling update soal harga emas di Indonesia! Hari ini, {tgl}, ada update harga emas Antam yang WAJIB kamu tahu!",
@@ -580,11 +564,11 @@ def _pool_ch4(info, harga, kemarin, selisih, persen,
         f"Harga Emas LIVE {tgl} | Antam {harga} | {status.title()}",
         f"NAIK ATAU TURUN? Harga Emas Antam {tgl} | Update Live",
     ]
-    return openings, (tren_naik if status=="naik" else tren_turun if status=="turun" else tren_stabil), tips, historis_list, penutup, judul_list
+    trens = tren_naik if status == "naik" else tren_turun if status == "turun" else tren_stabil
+    return openings, trens, tips, historis_list, penutup, judul_list
 
 
-def _pool_ch5(info, harga, kemarin, selisih, persen,
-              status, tgl, hist):
+def _pool_ch5(info, harga, kemarin, selisih, persen, status, tgl, hist):
     """Channel 5: Cek Harga Emas - percakapan akrab"""
     openings = [
         f"Halo {SAPAAN}, eh kamu dateng juga nih ke channel {NAMA_CHANNEL}. Asyik deh, berarti kamu juga peduli sama investasi emas kayak aku. Yuk, kita ngobrol santai soal harga emas Antam hari ini, {tgl}.",
@@ -603,68 +587,69 @@ def _pool_ch5(info, harga, kemarin, selisih, persen,
     tren_turun = [
         f"Jujur aja nih, hari ini harga emas Antam turun sedikit. Ada di {harga} per gram, turun {selisih} dari kemarin yang {kemarin}. Persentasenya {persen}. Tapi hey, santai aja, ini bukan sesuatu yang perlu dipanikkan. Justru ini momen buat kamu yang mau tambah koleksi emas.",
         f"Harga emas Antam hari ini ada di {harga} per gram, turun {persen} atau {selisih} dari kemarin yang {kemarin}. Aku ngerti kalau kamu mungkin sedikit khawatir. Tapi percaya deh, dalam investasi jangka panjang, penurunan seperti ini itu hal yang sangat normal.",
-        f"Nah hari ini harga emas Antam turun nih, ke level {harga} per gram. Turunnya {selisih} atau {persen} dari kemarin di {kemarin}. Tapi kalau boleh aku share perspektif, penurunan harga emas itu artinya kamu bisa beli lebih banyak gram dengan uang yang sama.",
-        f"Harga emas Antam hari ini koreksi sedikit ke {harga} per gram, dari kemarin yang {kemarin}, turun {selisih} alias {persen}. Jangan langsung patah semangat ya, karena trader dan investor kawakan justru nunggu momen kayak gini untuk beli lebih banyak.",
-        f"Update hari ini, harga emas Antam ada di {harga} per gram nih, turun {persen} atau {selisih} dari kemarin di {kemarin}. Buat aku pribadi, setiap penurunan harga emas itu kayak diskon belanja. Momen terbaik untuk tambah koleksi.",
+        f"Nah hari ini harga emas Antam turun nih, ke level {harga} per gram. Turunnya {selisih} atau {persen} dari kemarin di {kemarin}. Tapi aku mau kasih perspektif yang berbeda, setiap kali harga turun, itu artinya kamu bisa dapat emas lebih banyak dengan uang yang sama.",
+        f"Emas Antam hari ini ada di {harga} per gram, turun {selisih} atau {persen} dari kemarin yang {kemarin}. Kalau dipikir-pikir, penurunan ini tuh kayak diskon belanja. Buat kamu yang lagi nabung buat beli emas, ini momen yang pas banget.",
+        f"Update harga emas hari ini, Antam ada di {harga} per gram, turun {persen} atau {selisih} dari kemarin di {kemarin}. Aku sendiri sih melihat ini sebagai kesempatan. Karena sejarah selalu membuktikan, harga emas yang turun hari ini bisa jadi harga terendah yang kamu sesali kalau nggak beli.",
     ]
     tren_stabil = [
-        f"Harga emas Antam hari ini anteng nih sahabat, ada di {harga} per gram. Hampir sama dengan kemarin yang {kemarin}. Kalau kata orang investasi, kondisi sideways begini itu sebenarnya bagus untuk akumulasi perlahan-lahan.",
-        f"Hari ini harga emas Antam adem ayem di {harga} per gram, nggak jauh dari kemarin yang {kemarin}. Buat aku ini malah enak, artinya nggak ada fluktuasi besar yang bikin bingung. Waktu yang pas buat nabung emas rutin.",
-        f"Nah update hari ini, harga emas Antam stabil di {harga} per gram, hampir sama kayak kemarin di {kemarin}. Kondisi flat seperti ini sebenarnya friendly banget buat investor jangka panjang yang pengen beli tanpa khawatir beli di puncak harga.",
-        f"Harga emas Antam hari ini kalem nih, di {harga} per gram, relatif sama dengan kemarin {kemarin}. Kalau kamu nanya kapan waktu terbaik beli emas, menurutku kondisi sideways seperti sekarang adalah salah satu waktu yang paling aman.",
-        f"Cerita harga emas hari ini, Antam ada di {harga} per gram, stabil dari kemarin yang {kemarin}. Nggak naik nggak turun, tapi justru ini yang aku suka. Harga yang stabil itu bikin kita lebih mudah merencanakan investasi secara teratur.",
+        f"Hari ini harga emas Antam terpantau adem ayem nih sahabat, ada di {harga} per gram. Hampir sama persis sama kemarin yang {kemarin}. Stabil begini sebenarnya bagus lho, artinya pasar emas lagi dalam kondisi sehat dan seimbang.",
+        f"Harga emas Antam hari ini flat di {harga} per gram, nggak jauh beda dari kemarin yang {kemarin}. Kalau kamu nanya aku, kondisi sideways gini justru enak buat mulai akumulasi emas secara bertahap sebelum harga bergerak naik lagi.",
+        f"Update hari ini, emas Antam stabil di {harga} per gram, relatif sama dengan kemarin di {kemarin}. Santai dulu nggak apa-apa, kondisi seperti ini sering jadi periode istirahat sebelum harga melanjutkan pergerakan ke atas.",
+        f"Emas Antam hari ini bergerak kalem di {harga} per gram, nggak banyak berubah dari kemarin yang {kemarin}. Buat kamu yang lagi mikirin kapan waktu terbaik beli emas, kondisi stabil kayak gini bisa jadi jawabannya.",
+        f"Harga emas Antam hari ini ada di posisi {harga} per gram, stabil dari kemarin di {kemarin}. Ibarat kata, emas lagi ngambil napas sejenak sebelum lanjut perjalanan. Dan biasanya setelah konsolidasi, pergerakan selanjutnya cukup signifikan.",
     ]
     tips = [
-        "Oh iya, aku mau share satu tips yang menurut aku paling penting dalam investasi emas. Jangan pernah bandingkan harga emas hari ini dengan harga seminggu lalu dan langsung panik. Yang harus kamu bandingkan adalah harga emas sekarang dengan harga emas setahun atau lima tahun lalu. Di situ kamu bakal lihat betapa konsistennya emas dalam menjaga dan menumbuhkan nilai.",
-        "Ngomong-ngomong soal investasi emas, ada hal yang sering ditanyain ke aku. Mending beli emas fisik atau emas digital? Jawabannya tergantung tujuan kamu. Kalau mau pegangan fisik dan tidak masalah bayar biaya cetak, emas Antam fisik adalah pilihan terbaik. Kalau mau lebih fleksibel dan mudah ditransaksikan, emas digital bisa jadi alternatif. Tapi untuk proteksi jangka panjang, emas fisik selalu jadi pilihan utamaku.",
-        "Aku mau cerita sesuatu yang aku pelajari dari pengalaman investasi emas. Kunci suksesnya bukan di timing yang sempurna, tapi di konsistensi dan kesabaran. Orang yang beli emas rutin selama sepuluh tahun, tidak peduli harga naik atau turun, hampir pasti meraih keuntungan yang signifikan. Konsistensi mengalahkan kecerdasan dalam investasi jangka panjang.",
-        "Tips praktis nih dari aku, kalau mau mulai investasi emas tapi bingung mulai dari mana, coba target satu gram per bulan dulu. Dengan harga sekitar tiga juta rupiah, itu setara dengan seratus ribu rupiah per hari. Lebih murah dari secangkir kopi di kafe mahal, tapi dampaknya buat masa depan finansial kamu jauh lebih besar.",
-        "Satu hal yang bikin emas berbeda dari instrumen investasi lain adalah sifatnya sebagai aset universal. Emas dihargai di seluruh penjuru dunia, dari Indonesia sampai Amerika, dari Asia sampai Eropa. Tidak ada mata uang atau aset lain yang punya pengakuan universal seperti emas. Ini yang membuat emas tetap relevan sebagai investasi bahkan di tengah ketidakpastian ekonomi global sekalipun.",
+        "Aku mau berbagi tips yang sering aku omongin ke teman-teman yang baru mau mulai investasi emas. Pertama, mulai dari yang kamu mampu dulu. Nggak perlu langsung beli banyak. Satu gram atau bahkan setengah gram pun sudah jadi langkah yang luar biasa. Yang penting konsisten dan rutin setiap bulan. Lama-lama nggak kerasa, tabungan emas kamu bakal terkumpul cukup banyak.",
+        "Pernah nggak kamu kepikiran kenapa nenek moyang kita dulu suka nyimpan emas? Karena mereka tahu bahwa emas itu nilainya nggak kemakan inflasi. Beda sama uang tunai yang nilainya bisa terus tergerus. Jadi kalau kamu punya kelebihan uang yang nggak terpakai dalam waktu dekat, pertimbangkan untuk simpan dalam bentuk emas. Cara paling sederhana untuk melindungi kekayaan kamu.",
+        "Tips dari aku buat kamu yang baru mulai: jangan terlalu sering cek harga emas setiap jam. Itu malah bikin kamu stres sendiri. Emas itu investasi jangka panjang, jadi cukup pantau harganya seminggu sekali atau sebulan sekali. Yang penting kamu rutin beli dan sabar menunggu hasilnya. Percaya deh, hasilnya bakal bikin kamu senyum.",
+        "Mau tahu rahasia investor emas yang sukses? Mereka nggak panik saat harga turun dan nggak serakah saat harga naik. Mereka punya rencana yang jelas: beli rutin, tahan lama, jual saat betul-betul butuh atau sudah mencapai target keuntungan. Sesederhana itu. Kamu juga bisa lakukan hal yang sama mulai hari ini.",
+        "Satu hal yang kadang dilupakan orang soal investasi emas adalah pentingnya penyimpanan yang aman. Kalau kamu punya emas fisik, pastikan disimpan di tempat yang aman, bisa di brankas rumah atau safe deposit box di bank. Jangan lupa juga untuk selalu simpan sertifikat keaslian emas kamu. Itu dokumen penting yang menentukan nilai jual kembali emas kamu nantinya.",
     ]
     historis_list = [
-        f"Biar kamu punya gambaran yang lebih utuh, kita tengok dulu yuk pergerakan harga emas di masa lalu. {hist} Kalau dilihat dari data ini, kamu bisa makin yakin bahwa emas itu memang bisa diandalkan sebagai instrumen investasi jangka panjang.",
-        f"Aku mau ajak kamu lihat data historis harga emas supaya kamu tidak cuma fokus ke pergerakan hari ini. {hist} Menarik kan? Setiap periode punya ceritanya sendiri, tapi kesimpulannya tetap sama, emas itu investasi yang solid.",
-        f"Yuk kita lihat bareng-bareng rekap harga emas di periode sebelumnya, biar kamu dapat perspektif yang lebih luas. {hist} Dari data ini kamu bisa lihat sendiri betapa tangguhnya emas dalam menghadapi berbagai kondisi ekonomi.",
-        f"Nggak lengkap kalau kita bahas harga hari ini tanpa lihat konteks historisnya juga. Ini dia datanya. {hist} Gimana menurut kamu? Menurutku ini membuktikan bahwa emas adalah teman setia dalam perjalanan investasi jangka panjang.",
-        f"Data historis ini aku bagikan bukan untuk bikin kamu pusing, tapi justru untuk kasih kamu keyakinan lebih dalam berinvestasi emas. {hist} Setelah lihat data ini, kamu harusnya makin mantap dan percaya diri dengan pilihan investasi emas kamu.",
+        f"Biar kita nggak cuma lihat hari ini aja, yuk intip juga data historis pergerakan emas Antam. {hist} Seru kan ngeliat gimana emas bergerak dari waktu ke waktu? Ini yang bikin aku makin yakin sama investasi emas.",
+        f"Aku selalu suka ngobrol soal data historis emas karena datanya selalu menarik. Nih kita lihat bareng-bareng. {hist} Gimana menurut kamu? Emas memang nggak pernah bohong ya soal ketahanan nilainya.",
+        f"Supaya kamu punya gambaran yang lebih lengkap, aku mau ajak kamu tengok data historis harga emas Antam. {hist} Dari sini kamu bisa lihat sendiri betapa konsistennya emas dalam menjaga nilai dari waktu ke waktu.",
+        f"Data historis selalu jadi bahan obrolan favorit aku karena bisa kasih perspektif yang lebih luas. Ini dia datanya. {hist} Menarik banget kan? Sekarang kamu punya alasan yang lebih kuat untuk yakin sama investasi emas.",
+        f"Yuk kita lihat jejak perjalanan harga emas Antam sebelumnya. {hist} Dari data ini, kamu bisa lihat sendiri gimana emas selalu punya cara untuk mempertahankan dan meningkatkan nilainya dari waktu ke waktu.",
     ]
     penutup = [
-        f"Nah, segitu dulu obrolan kita hari ini tentang harga emas Antam di channel {NAMA_CHANNEL}. Semoga ngobrol santai ini bermanfaat dan makin memantapkan langkah investasi kamu. Kalau ada pertanyaan, tulis di kolom komentar ya, aku baca semua. Jangan lupa like dan subscribe biar kita bisa ngobrol lagi besok.",
-        f"Makasih banget udah nemenin aku ngobrol soal emas hari ini di channel {NAMA_CHANNEL}. Semoga obrolan santai ini ngasih insight baru buat investasi kamu. Sampai besok ya, jaga kesehatan dan tetap semangat berinvestasi. Like dan subscribe dulu sebelum pergi.",
-        f"Oke sahabat, kita tutup obrolan hari ini sampai di sini dulu. Channel {NAMA_CHANNEL} akan balik lagi besok dengan update harga emas dan obrolan seru lainnya. Kalau bermanfaat, share ke teman yang lagi galau mau mulai investasi emas. Sampai jumpa.",
-        f"Itulah cerita emas hari ini dari channel {NAMA_CHANNEL}. Aku harap kamu dapet value yang nyata dari obrolan kita hari ini. Jangan sungkan subscribe dan aktifkan notifikasi ya, biar kita bisa terus ngobrol bareng setiap hari. Salam hangat dan sampai jumpa.",
-        f"Hari ini kita udah ngobrol panjang lebar soal harga emas Antam bersama channel {NAMA_CHANNEL}. Terima kasih sudah jadi bagian dari komunitas investor emas yang cerdas dan konsisten. Tinggalkan like, subscribe, dan bagikan ke sesama sahabat investor. Sampai ketemu di obrolan berikutnya.",
+        f"Nah, segitu dulu obrolan kita hari ini soal harga emas Antam dari channel {NAMA_CHANNEL}. Semoga ngobrol-ngobrol kita hari ini bermanfaat ya buat perjalanan investasi kamu. Kalau ada pertanyaan, tulis aja di kolom komentar, aku baca semua kok. Jangan lupa like dan subscribe biar kita bisa terus ngobrol setiap hari. Sampai jumpa besok.",
+        f"Oke sahabat, segitu dulu update dari channel {NAMA_CHANNEL} hari ini. Seneng banget bisa berbagi info sama kamu. Kalau kamu merasa video ini bermanfaat, share ke teman-teman kamu yang juga mau mulai investasi emas ya. Like, comment, subscribe, dan sampai jumpa di update berikutnya.",
+        f"Gimana, cukup jelas kan infonya hari ini? Channel {NAMA_CHANNEL} bakal terus hadir setiap hari buat menemani perjalanan investasi emas kamu. Ingat, konsisten itu kunci. Yuk kita sama-sama jadi investor emas yang cerdas. Subscribe dan aktifkan notifikasi ya. Sampai jumpa.",
+        f"Makasih banget udah mau ngobrol sama aku hari ini di channel {NAMA_CHANNEL}. Semoga info harga emas Antam hari ini bisa jadi bahan pertimbangan yang bagus buat keputusan investasi kamu. Jangan lupa subscribe ya, gratis dan bermanfaat banget. Sampai ketemu lagi besok.",
+        f"Itu tadi obrolan santai kita soal harga emas Antam hari ini bersama channel {NAMA_CHANNEL}. Terus semangat investasinya ya, karena masa depan finansial yang lebih baik itu bisa dimulai dari langkah kecil hari ini. Like, share, dan subscribe. Salam hangat dan sampai jumpa.",
     ]
     judul_list = [
-        f"Cek Harga Emas Antam {tgl} | {harga} per Gram",
-        f"Harga Emas Hari Ini {tgl} | {status.title()} {persen} | Antam",
-        f"Ngecek Emas Antam {tgl} | Update Harga Terbaru",
-        f"Harga Emas Antam {tgl}: {harga} per Gram | {status.title()}",
-        f"Update Santai Harga Emas {tgl} | Antam {harga}",
+        f"Ngobrol Harga Emas Antam {tgl} | {harga} per Gram | {NAMA_CHANNEL}",
+        f"Cek Emas Antam {tgl} | {status.title()} {persen} | Obrolan Santai",
+        f"Harga Emas Antam Hari Ini {tgl} | Update Santai Bareng {NAMA_CHANNEL}",
+        f"Gimana Harga Emas {tgl}? | Antam {harga} | Cek Yuk",
+        f"Update Emas Antam {tgl} | {harga} per Gram | Ngobrol Bareng",
     ]
-    return openings, (tren_naik if status=="naik" else tren_turun if status=="turun" else tren_stabil), tips, historis_list, penutup, judul_list
+    trens = tren_naik if status == "naik" else tren_turun if status == "turun" else tren_stabil
+    return openings, trens, tips, historis_list, penutup, judul_list
 
 
 # ════════════════════════════════════════════════════════════
-# MAIN FALLBACK
+# FALLBACK BUILDER
 # ════════════════════════════════════════════════════════════
 
 def _buat_narasi_fallback(info):
     harga   = rp(info["harga_sekarang"])
     kemarin = rp(info["harga_kemarin"])
     selisih = rp(info["selisih"])
-    status  = info["status"].lower()
-    persen  = f"{info['persen']:.2f}"
-    tgl     = info["tanggal"]
+    status  = info["status"]
+    persen  = f"{info['persen']:.2f}%"
+    tgl     = _tgl_id(info["tanggal"])
 
-    # Bangun teks historis
     hist_parts = []
     lbl_map = [
-        ("7_hari",  "tujuh hari terakhir"),
-        ("1_bulan", "satu bulan terakhir"),
-        ("3_bulan", "tiga bulan terakhir"),
-        ("6_bulan", "enam bulan terakhir"),
-        ("1_tahun", "satu tahun terakhir"),
+        ("kemarin", "kemarin"),
+        ("7_hari",  "7 hari lalu"),
+        ("1_bulan", "1 bulan lalu"),
+        ("3_bulan", "3 bulan lalu"),
+        ("6_bulan", "6 bulan lalu"),
+        ("1_tahun", "1 tahun lalu"),
     ]
     for key, label in lbl_map:
         d = info["historis"].get(key)
@@ -673,92 +658,65 @@ def _buat_narasi_fallback(info):
                  "turun" if not d["stabil"] else \
                  "stabil"
             hist_parts.append(
-                f"Dalam {label}, harga emas Antam "
-                f"tercatat {ar} sebesar "
-                f"{abs(d['persen']):.2f} persen "
-                f"dengan selisih {rp(abs(d['selisih']))}."
+                f"dibanding {label} harga {ar} "
+                f"{abs(d['persen']):.2f}% "
+                f"sebesar {rp(abs(d['selisih']))}"
             )
-    hist = " ".join(hist_parts) if hist_parts else \
-           "Data historis belum tersedia saat ini."
+    hist = (". ".join(hist_parts) + ".") if hist_parts else ""
 
-    # Pilih pool berdasarkan CHANNEL_ID
-    pool_fn = {
-        1: _pool_ch1,
-        2: _pool_ch2,
-        3: _pool_ch3,
-        4: _pool_ch4,
-        5: _pool_ch5,
-    }.get(CHANNEL_ID, _pool_ch1)
+    pool_map = {
+        "1": _pool_ch1,
+        "2": _pool_ch2,
+        "3": _pool_ch3,
+        "4": _pool_ch4,
+        "5": _pool_ch5,
+    }
+    ch_key = str(CHANNEL_ID) if str(CHANNEL_ID) in pool_map else "3"
+    pool_fn = pool_map[ch_key]
 
-    openings, trens, tips, historis_list, penutup, judul_list = \
-        pool_fn(info, harga, kemarin, selisih, persen,
-                status, tgl, hist)
+    openings, trens, tips, historis_list, penutup, judul_list = pool_fn(
+        info, harga, kemarin, selisih, persen, status, tgl, hist
+    )
 
-    opening      = random.choice(openings)
-    tren_para    = random.choice(trens)
-    tips_para    = random.choice(tips)
-    historis_para = random.choice(historis_list)
-    penutup_para = random.choice(penutup)
-    judul        = random.choice(judul_list)
+    opening  = random.choice(openings)
+    tren     = random.choice(trens)
+    tip      = random.choice(tips)
+    historis = random.choice(historis_list)
+    closing  = random.choice(penutup)
+    judul    = random.choice(judul_list)
 
-    narasi = f"""{opening}
-
-{tren_para}
-
-{historis_para}
-
-{tips_para}
-
-Sebelum kita akhiri, ada beberapa hal penting yang perlu selalu diingat dalam perjalanan investasi emas. Pertama, pastikan selalu beli emas dari sumber yang terpercaya dan resmi seperti butik Antam, platform emas digital berlisensi, atau toko emas terpercaya yang menjual emas bersertifikat. Kedua, simpan emas dan sertifikatnya di tempat yang aman karena sertifikat adalah bukti keaslian yang sangat penting. Ketiga, pantau harga emas secara rutin namun jangan terlalu sering mengambil keputusan berdasarkan fluktuasi harian yang bersifat jangka pendek.
-
-Ingatlah bahwa investasi emas adalah maraton, bukan sprint. Kesabaran dan konsistensi adalah dua kunci utama yang membedakan investor emas yang sukses dari yang tidak. Setiap gram emas yang kamu miliki adalah langkah nyata menuju kebebasan finansial yang kamu impikan.
-
-{penutup_para}"""
-
+    narasi = "\n\n".join([opening, tren, historis, tip, closing])
     return judul, narasi
 
 
 # ════════════════════════════════════════════════════════════
-# MAIN
+# MAIN ENTRY POINT
 # ════════════════════════════════════════════════════════════
 
-def buat_narasi_dan_judul(info):
-    log("[2/6] Membuat narasi & judul...")
+def buat_narasi(info):
+    log("Membuat narasi...")
     prompt = _build_prompt(info)
 
-    # ── Coba Gemini dulu ──────────────────────────────────
+    # Coba Gemini dulu
     raw = _call_gemini(prompt)
-    if raw:
-        judul, narasi = _parse_output(raw)
-        if len(narasi.split()) >= 350:
-            log(f"  -> Gemini OK — "
-                f"{len(narasi.split())} kata")
-            log(f"  -> Judul: {judul[:60]}...")
-            return judul, narasi
-        else:
-            log(f"  -> Narasi Gemini terlalu pendek "
-                f"({len(narasi.split())} kata), "
-                f"coba OpenRouter...")
 
-    # ── Coba OpenRouter sebagai fallback ─────────────────
-    raw = _call_openrouter(prompt)
-    if raw:
-        judul, narasi = _parse_output(raw)
-        if len(narasi.split()) >= 350:
-            log(f"  -> OpenRouter OK — "
-                f"{len(narasi.split())} kata")
-            log(f"  -> Judul: {judul[:60]}...")
-            return judul, narasi
-        else:
-            log(f"  -> Narasi OpenRouter terlalu pendek "
-                f"({len(narasi.split())} kata), "
-                f"pakai fallback lokal...")
+    # Fallback ke OpenRouter
+    if not raw:
+        log("  -> Coba OpenRouter sebagai fallback...")
+        raw = _call_openrouter(prompt)
 
-    # ── Fallback lokal jika semua API gagal ──────────────
-    log("  -> Pakai narasi fallback lokal...")
-    judul, narasi = _buat_narasi_fallback(info)
-    log(f"  -> Fallback OK — "
-        f"{len(narasi.split())} kata")
-    log(f"  -> Judul: {judul[:60]}...")
+    # Fallback ke template lokal
+    if not raw:
+        log("  -> Semua API gagal, pakai template fallback lokal")
+        judul, narasi = _buat_narasi_fallback(info)
+        log(f"  -> Fallback OK: judul={judul[:50]}...")
+        return judul, narasi
+
+    judul, narasi = _parse_output(raw)
+
+    if not narasi or len(narasi.strip()) < 200:
+        log("  -> Output API terlalu pendek, pakai fallback")
+        judul, narasi = _buat_narasi_fallback(info)
+
+    log(f"  -> Narasi OK ({len(narasi.split())} kata)")
     return judul, narasi
-

@@ -693,7 +693,7 @@ def _buat_narasi_fallback(info):
 # MAIN ENTRY POINT
 # ════════════════════════════════════════════════════════════
 
-def buat_narasi(info):
+def buat_narasi_dan_judul(info):
     log("Membuat narasi...")
     prompt = _build_prompt(info)
 

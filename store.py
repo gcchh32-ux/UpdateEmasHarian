@@ -1,5 +1,5 @@
 # store.py
-import os, glob, time, random
+import os, glob, time, random, shutil
 import requests
 from config import (
     PEXELS_API_KEY,
@@ -40,6 +40,8 @@ PIXABAY_KEYWORDS = [
     "stacked gold bars",
 ]
 
+FOLDER_GAMBAR_STATIC = "gambar_static"
+
 
 def _is_relevan(alt_text, url=""):
     teks = (alt_text + " " + url).lower()
@@ -54,8 +56,33 @@ def list_gambar():
     )
 
 
+def list_gambar_static():
+    return sorted(
+        glob.glob(f"{FOLDER_GAMBAR_STATIC}/*.jpg")
+        + glob.glob(f"{FOLDER_GAMBAR_STATIC}/*.jpeg")
+        + glob.glob(f"{FOLDER_GAMBAR_STATIC}/*.png")
+    )
+
+
 def list_video_bank():
     return sorted(glob.glob(f"{FOLDER_VIDEO_BANK}/*.mp4"))
+
+
+def _duplikasi_sampai_cukup(target):
+    """Duplikasi gambar yang sudah ada sampai mencapai target jumlah."""
+    base_list = list_gambar()
+    if not base_list:
+        return
+    idx = 0
+    while len(list_gambar()) < target:
+        src = base_list[idx % len(base_list)]
+        ext = os.path.splitext(src)[1]
+        dst = f"{FOLDER_GAMBAR}/dup_{int(time.time())}_{idx}{ext}"
+        if not os.path.exists(dst):
+            shutil.copy(src, dst)
+        idx += 1
+        time.sleep(0.01)  # hindari nama file sama persis
+    log(f"[STORAGE] Duplikasi selesai: {len(list_gambar())} gambar")
 
 
 # ════════════════════════════════════════════════════════════
@@ -64,46 +91,58 @@ def list_video_bank():
 
 def kelola_bank_gambar():
     os.makedirs(FOLDER_GAMBAR, exist_ok=True)
+    os.makedirs(FOLDER_GAMBAR_STATIC, exist_ok=True)
 
-    # Hapus semua gambar lama
+    # Hapus semua gambar lama hasil download/salin sebelumnya
     for f in list_gambar():
         try:
             os.remove(f)
         except Exception:
             pass
 
-    # FIX: pakai JUMLAH_DL_GAMBAR dari config, bukan hardcode 2
-    log(f"[STORAGE] Download {JUMLAH_DL_GAMBAR} gambar baru (keyword berbeda)...")
-    _download_gambar_pexels(JUMLAH_DL_GAMBAR)
+    # ── PRIORITAS 1: Salin dari gambar_static (repo GitHub) ──
+    gambar_static = list_gambar_static()
+    if gambar_static:
+        random.shuffle(gambar_static)
+        # Ambil semua jika < JUMLAH_DL_GAMBAR, atau sejumlah target
+        dipilih = gambar_static[:max(JUMLAH_DL_GAMBAR, len(gambar_static))]
+        for src in dipilih:
+            dst = f"{FOLDER_GAMBAR}/{os.path.basename(src)}"
+            try:
+                shutil.copy(src, dst)
+            except Exception as e:
+                log(f"  -> [Static] Gagal salin {src}: {e}")
+        log(f"[STORAGE] ✅ Salin {len(list_gambar())} gambar dari {FOLDER_GAMBAR_STATIC}/")
+    else:
+        # ── PRIORITAS 2: Download dari Pexels ──
+        log(f"[STORAGE] {FOLDER_GAMBAR_STATIC}/ kosong, download {JUMLAH_DL_GAMBAR} dari Pexels...")
+        _download_gambar_pexels(JUMLAH_DL_GAMBAR)
 
     ada = list_gambar()
 
-    # Fallback Pixabay jika Pexels kurang dari JUMLAH_GAMBAR_MIN
+    # ── PRIORITAS 3: Tambah dari Pixabay jika masih kurang ──
     if len(ada) < JUMLAH_GAMBAR_MIN:
         kurang = JUMLAH_DL_GAMBAR - len(ada)
-        log(f"[STORAGE] Pexels kurang ({len(ada)}/{JUMLAH_GAMBAR_MIN}), coba Pixabay ({kurang} lagi)...")
+        log(f"[STORAGE] Kurang ({len(ada)}/{JUMLAH_GAMBAR_MIN}), coba Pixabay ({kurang} lagi)...")
         _download_gambar_pixabay(kurang)
         ada = list_gambar()
 
-    # Masih kurang? duplikasi agar render tidak gagal
-    if len(ada) < JUMLAH_GAMBAR_MIN and len(ada) > 0:
-        import shutil
-        log(f"[STORAGE] Masih kurang ({len(ada)}), duplikasi gambar yang ada...")
-        base_list = list_gambar()
-        idx = 0
-        while len(list_gambar()) < JUMLAH_GAMBAR_MIN:
-            src = base_list[idx % len(base_list)]
-            ext = os.path.splitext(src)[1]
-            dst = f"{FOLDER_GAMBAR}/dup_{int(time.time())}_{idx}{ext}"
-            if not os.path.exists(dst):
-                shutil.copy(src, dst)
-            idx += 1
+    # ── PRIORITAS 4: Masih kurang → download Pexels lagi ──
+    if len(ada) < JUMLAH_GAMBAR_MIN:
+        kurang = JUMLAH_DL_GAMBAR - len(ada)
+        log(f"[STORAGE] Masih kurang ({len(ada)}), coba Pexels lagi ({kurang} lagi)...")
+        _download_gambar_pexels(kurang)
         ada = list_gambar()
-        log(f"[STORAGE] Setelah duplikasi: {len(ada)} gambar")
 
-    # Fallback darurat: tidak ada gambar sama sekali
+    # ── PRIORITAS 5: Darurat → duplikasi gambar yang ada ──
+    if len(ada) < JUMLAH_GAMBAR_MIN and len(ada) > 0:
+        log(f"[STORAGE] Darurat: duplikasi gambar yang ada ({len(ada)}) sampai {JUMLAH_GAMBAR_MIN}...")
+        _duplikasi_sampai_cukup(JUMLAH_GAMBAR_MIN)
+        ada = list_gambar()
+
+    # ── PRIORITAS 6: Benar-benar kosong → download ulang semua ──
     if len(ada) == 0:
-        log("[STORAGE] ⚠️ Tidak ada gambar! Coba download ulang semua keyword...")
+        log("[STORAGE] ⚠️ Tidak ada gambar sama sekali! Download ulang semua keyword...")
         _download_gambar_pexels(JUMLAH_DL_GAMBAR)
         _download_gambar_pixabay(JUMLAH_DL_GAMBAR)
         ada = list_gambar()
@@ -119,16 +158,13 @@ def _download_gambar_pexels(jumlah):
 
     headers = {"Authorization": PEXELS_API_KEY}
 
-    # Acak semua keyword, coba satu per satu sampai dapat 'jumlah' gambar
+    # Putar keyword sampai cukup memenuhi jumlah
     kw_semua = KATA_KUNCI_GAMBAR.copy()
     random.shuffle(kw_semua)
-
-    # FIX: jika keyword tidak cukup, ulang pakai semua keyword lagi
-    # Misal jumlah=20 tapi keyword cuma 8, putar ulang keyword
     kw_pool = []
     while len(kw_pool) < jumlah:
         kw_pool.extend(kw_semua)
-    kw_pool = kw_pool[:jumlah * 2]  # cadangan 2x supaya ada ruang skip
+    kw_pool = kw_pool[:jumlah * 2]  # cadangan 2x
 
     ts    = int(time.time())
     total = 0
@@ -178,12 +214,12 @@ def _download_gambar_pexels(jumlah):
                     dapat = True
                     log(f"  -> ✅ [Pexels] [{kw}] "
                         f"{len(data)//1024}KB")
-                    break  # 1 gambar per keyword, lanjut keyword berikutnya
+                    break  # 1 gambar per keyword
                 except Exception as e:
                     log(f"  -> [Pexels] Gagal download: {e}")
 
             if not dapat:
-                log(f"  -> [Pexels] '{kw}': tidak ada foto relevan, coba keyword lain...")
+                log(f"  -> [Pexels] '{kw}': tidak ada foto relevan")
 
         except Exception as e:
             log(f"  -> [Pexels] Error '{kw}': {e}")
@@ -198,7 +234,6 @@ def _download_gambar_pixabay(jumlah):
         log("  -> PIXABAY_API_KEY kosong, skip!")
         return
 
-    # FIX: putar keyword jika jumlah > panjang PIXABAY_KEYWORDS
     kw_pool = []
     while len(kw_pool) < jumlah:
         kw_pool.extend(PIXABAY_KEYWORDS)
@@ -412,6 +447,8 @@ def debug_storage():
     log("=== DEBUG STORAGE ===")
     log(f"  Bank gambar  : {len(list_gambar())} "
         f"file (min:{JUMLAH_GAMBAR_MIN})")
+    log(f"  Gambar static: {len(list_gambar_static())} "
+        f"file di {FOLDER_GAMBAR_STATIC}/")
     log(f"  Bank video   : {len(list_video_bank())} "
         f"file (min:{JUMLAH_VIDEO_MIN})")
     log(f"  Video hasil  : "

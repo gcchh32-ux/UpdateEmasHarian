@@ -130,7 +130,7 @@ HISTORIS PERUBAHAN:
 
 TUGAS:
 1. Buat JUDUL video menarik (maksimal 80 karakter)
-2. Buat NARASI video berdurasi 3-4 menit (450-550 kata)
+2. Buat NARASI video berdurasi 5-7 menit (750-1000 kata)
 
 FORMAT OUTPUT (WAJIB IKUTI PERSIS):
 JUDUL: [judul video di sini]
@@ -147,7 +147,7 @@ ATURAN NARASI:
 - JANGAN gunakan tanda bintang atau markdown
 - Tulis angka dalam kata: satu juta enam ratus ribu rupiah
 - Natural saat dibaca/didengar (text-to-speech)
-- WAJIB minimal 450 kata, jangan singkat"""
+- WAJIB minimal 750 kata, minimal 5 menit saat dibacakan, jangan singkat
 
 # ════════════════════════════════════════════════════════════
 # CALL GEMINI
@@ -173,7 +173,7 @@ def _call_gemini(prompt):
                         }],
                         "generationConfig": {
                             "temperature":     0.8,
-                            "maxOutputTokens": 1500,
+                            "maxOutputTokens": 3000,
                             "topP":            0.9,
                         },
                     },

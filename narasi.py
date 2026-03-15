@@ -337,7 +337,7 @@ def _parse_output(raw):
 
 def _pool_ch1(info, harga, kemarin, selisih, persen,
               status, tgl, hist):
-    """Channel 1: Sobat Antam — formal analitis"""
+    """Channel 1: Sobat Antam - formal analitis"""
     openings = [
         f"Halo {SAPAAN}, selamat datang kembali di channel {NAMA_CHANNEL}. Pada kesempatan hari ini, {tgl}, kami hadir membawa analisis lengkap pergerakan harga emas Antam yang perlu Anda cermati sebelum mengambil keputusan investasi.",
         f"Halo {SAPAAN}, salam investasi cerdas dari channel {NAMA_CHANNEL}. Hari ini, {tgl}, kami akan mengulas secara mendalam perkembangan harga emas Antam beserta implikasinya bagi portofolio investasi Anda.",
@@ -399,7 +399,7 @@ def _pool_ch1(info, harga, kemarin, selisih, persen,
 
 def _pool_ch2(info, harga, kemarin, selisih, persen,
               status, tgl, hist):
-    """Channel 2: Update Emas Harian — santai edukatif"""
+    """Channel 2: Update Emas Harian - santai edukatif"""
     openings = [
         f"Halo {SAPAAN}, selamat datang lagi di channel {NAMA_CHANNEL}. Yuk kita bahas bareng-bareng harga emas Antam hari ini, {tgl}, biar kamu makin pinter soal investasi emas.",
         f"Halo {SAPAAN}, ketemu lagi nih sama channel {NAMA_CHANNEL}. Hari ini, {tgl}, kita bakal update harga emas Antam terbaru plus ada tips investasi yang berguna banget buat kamu.",
@@ -461,7 +461,7 @@ def _pool_ch2(info, harga, kemarin, selisih, persen,
 
 def _pool_ch3(info, harga, kemarin, selisih, persen,
               status, tgl, hist):
-    """Channel 3: Info Logam Mulia — berita singkat"""
+    """Channel 3: Info Logam Mulia - berita singkat"""
     openings = [
         f"Halo {SAPAAN}, selamat menyaksikan Info Logam Mulia bersama channel {NAMA_CHANNEL}. Inilah laporan harga emas Antam terkini untuk hari ini, {tgl}.",
         f"Halo {SAPAAN}, ini adalah {NAMA_CHANNEL}. Kami hadir dengan laporan singkat dan informatif mengenai pergerakan harga emas Antam pada hari ini, {tgl}.",
@@ -523,7 +523,7 @@ def _pool_ch3(info, harga, kemarin, selisih, persen,
 
 def _pool_ch4(info, harga, kemarin, selisih, persen,
               status, tgl, hist):
-    """Channel 4: Harga Emas Live — energik motivatif"""
+    """Channel 4: Harga Emas Live - energik motivatif"""
     openings = [
         f"Halo {SAPAAN}! Selamat datang di channel {NAMA_CHANNEL}, channel paling update soal harga emas di Indonesia! Hari ini, {tgl}, ada update harga emas Antam yang WAJIB kamu tahu!",
         f"Halo {SAPAAN}! Yeay, ketemu lagi di channel {NAMA_CHANNEL}! Tanggal {tgl} ini ada kabar terbaru soal harga emas Antam yang bakal bikin kamu makin semangat berinvestasi!",
@@ -585,7 +585,7 @@ def _pool_ch4(info, harga, kemarin, selisih, persen,
 
 def _pool_ch5(info, harga, kemarin, selisih, persen,
               status, tgl, hist):
-    """Channel 5: Cek Harga Emas — percakapan akrab"""
+    """Channel 5: Cek Harga Emas - percakapan akrab"""
     openings = [
         f"Halo {SAPAAN}, eh kamu dateng juga nih ke channel {NAMA_CHANNEL}. Asyik deh, berarti kamu juga peduli sama investasi emas kayak aku. Yuk, kita ngobrol santai soal harga emas Antam hari ini, {tgl}.",
         f"Halo {SAPAAN}, hei hei, welcome back di channel {NAMA_CHANNEL}! Gimana hari ini, udah cek harga emas belum? Belum? Pas banget nih, hari ini, {tgl}, kita bahas bareng-bareng yuk.",

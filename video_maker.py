@@ -13,7 +13,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
-# ── Auto-install dependencies ────────────────────────────────
+# â”€â”€ Auto-install dependencies â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def pastikan_library_terinstall():
     cek = [
         "requests", "beautifulsoup4", "edge-tts",
@@ -48,36 +48,26 @@ from config import (
 FFMPEG_LOG = "ffmpeg_log.txt"
 
 
-# ════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # KEN BURNS - 10 variasi gerakan kamera
-# ════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 KEN_BURNS = [
-    # 1. Zoom in perlahan dari tengah
     "zoompan=z='min(zoom+0.0015,1.5)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=300:s=1920x1080:fps=30",
-    # 2. Zoom out dari 1.5 ke 1.0
     "zoompan=z='if(eq(on,1),1.5,max(1.001,zoom-0.0015))':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=300:s=1920x1080:fps=30",
-    # 3. Pan kiri ke kanan + zoom ringan
     "zoompan=z='1.3':x='if(eq(on,1),0,min(iw-iw/zoom,x+2))':y='ih/2-(ih/zoom/2)':d=300:s=1920x1080:fps=30",
-    # 4. Pan kanan ke kiri
     "zoompan=z='1.3':x='if(eq(on,1),iw-iw/zoom,max(0,x-2))':y='ih/2-(ih/zoom/2)':d=300:s=1920x1080:fps=30",
-    # 5. Pan atas ke bawah
     "zoompan=z='1.3':x='iw/2-(iw/zoom/2)':y='if(eq(on,1),0,min(ih-ih/zoom,y+1.5))':d=300:s=1920x1080:fps=30",
-    # 6. Pan bawah ke atas
     "zoompan=z='1.3':x='iw/2-(iw/zoom/2)':y='if(eq(on,1),ih-ih/zoom,max(0,y-1.5))':d=300:s=1920x1080:fps=30",
-    # 7. Zoom in + diagonal kiri atas
     "zoompan=z='min(zoom+0.001,1.4)':x='if(eq(on,1),0,min(iw-iw/zoom,x+1.5))':y='if(eq(on,1),0,min(ih-ih/zoom,y+0.8))':d=300:s=1920x1080:fps=30",
-    # 8. Zoom in + diagonal kanan bawah
     "zoompan=z='min(zoom+0.001,1.4)':x='if(eq(on,1),iw-iw/zoom,max(0,x-1.5))':y='if(eq(on,1),ih-ih/zoom,max(0,y-0.8))':d=300:s=1920x1080:fps=30",
-    # 9. Zoom in lembut + geser kanan
     "zoompan=z='min(zoom+0.0008,1.25)':x='if(eq(on,1),0,min(iw-iw/zoom,x+1))':y='ih/2-(ih/zoom/2)':d=300:s=1920x1080:fps=30",
-    # 10. Zoom out + geser kiri
     "zoompan=z='if(eq(on,1),1.3,max(1.001,zoom-0.001))':x='if(eq(on,1),iw-iw/zoom,max(0,x-1))':y='ih/2-(ih/zoom/2)':d=300:s=1920x1080:fps=30",
 ]
 
 
-# ════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # XFADE TRANSITIONS - 28 jenis transisi random
-# ════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 XFADE_TRANSITIONS = [
     "fade", "fadeblack", "fadewhite",
     "wipeleft", "wiperight", "wipeup", "wipedown",
@@ -91,14 +81,13 @@ XFADE_TRANSITIONS = [
 ]
 
 
-# ── Helpers ──────────────────────────────────────────────────
-
+# â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def escape_ffmpeg_path(path):
     return path.replace("\\", "/").replace(":", "\\:")
 
 
 def bersihkan_teks_untuk_robot(teks):
-    teks_bersih = re.sub(r"\[.*?\]|\(.*?\)|\*.*?\*", "", teks)
+    teks_bersih = re.sub(r"\[.*?\]|\(.*?\)|\*.\*?\*", "", teks)
     return teks_bersih.strip()
 
 
@@ -116,16 +105,15 @@ def siapkan_font_lokal():
         if os.path.exists(path):
             try:
                 shutil.copy(path, font_lokal)
-                print(f"  -> Font: {path}")
+                print(f" -> Font: {path}")
                 return font_lokal
             except Exception:
                 continue
-    print("  -> PERINGATAN: Font tidak ditemukan, pakai font default FFmpeg.")
+    print(" -> PERINGATAN: Font tidak ditemukan, pakai font default FFmpeg.")
     return None
 
 
-# ── Step 1: Scrape harga emas ────────────────────────────────
-
+# â”€â”€ Step 1: Scrape harga emas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def scrape_dan_kalkulasi_harga():
     print("[1/6] Scraping harga emas...")
     url     = "https://www.logammulia.com/id/harga-emas-hari-ini"
@@ -148,10 +136,10 @@ def scrape_dan_kalkulasi_harga():
                         break
 
         if harga_1_gram == 0:
-            print("  -> ERROR: Gagal parse harga dari website Antam.")
+            print(" -> ERROR: Gagal parse harga dari website Antam.")
             return None
 
-        print(f"  -> [logammulia] 1 gr = Rp {harga_1_gram:,}".replace(",", "."))
+        print(f" -> [logammulia] 1 gr = Rp {harga_1_gram:,}".replace(",", "."))
 
         file_history  = "history_harga.json"
         harga_kemarin = harga_1_gram
@@ -166,11 +154,11 @@ def scrape_dan_kalkulasi_harga():
                 pass
 
         if harga_1_gram > harga_kemarin:
-            status, selisih = "naik",   harga_1_gram - harga_kemarin
+            status, selisih = "Naik",   harga_1_gram - harga_kemarin
         elif harga_1_gram < harga_kemarin:
-            status, selisih = "turun",  harga_kemarin - harga_1_gram
+            status, selisih = "Turun",  harga_kemarin - harga_1_gram
         else:
-            status, selisih = "stabil", 0
+            status, selisih = "Stabil", 0
 
         persen = (selisih / harga_kemarin * 100) if harga_kemarin else 0.0
 
@@ -182,11 +170,11 @@ def scrape_dan_kalkulasi_harga():
             )
 
         waktu = datetime.now().strftime("%H:%M WIB")
-        print(f"  -> ✅ Harga ditemukan: Rp {harga_1_gram:,}".replace(",", "."))
-        print(f"  -> Harga   : Rp {harga_1_gram:,}".replace(",", "."))
-        print(f"  -> Kemarin : Rp {harga_kemarin:,}".replace(",", "."))
-        print(f"  -> Status  : {status.title()} ({persen:+.2f}%)")
-        print(f"  -> Selisih : Rp {selisih:,}".replace(",", "."))
+        print(f" -> âœ… Harga ditemukan: Rp {harga_1_gram:,}".replace(",", "."))
+        print(f" -> Harga   : Rp {harga_1_gram:,}".replace(",", "."))
+        print(f" -> Kemarin : Rp {harga_kemarin:,}".replace(",", "."))
+        print(f" -> Status  : {status} ({persen:+.2f}%)")
+        print(f" -> Selisih : Rp {selisih:,}".replace(",", "."))
 
         return {
             "harga_sekarang": harga_1_gram,
@@ -200,19 +188,18 @@ def scrape_dan_kalkulasi_harga():
         }
 
     except Exception as e:
-        print(f"  -> Gagal scraping: {e}")
+        print(f" -> Gagal scraping: {e}")
         return None
 
 
-# ── Step 3: Generate suara ────────────────────────────────────
-
+# â”€â”€ Step 3: Generate suara â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def buat_suara(teks, output_audio):
     print("[3/6] Generate suara...")
     teks_bersih = bersihkan_teks_untuk_robot(teks)
-    print(f"  -> Panjang teks: {len(teks_bersih)} karakter")
+    print(f" -> Panjang teks: {len(teks_bersih)} karakter")
 
     for attempt in range(1, 5):
-        print(f"  -> edge-tts attempt {attempt}/4...")
+        print(f" -> edge-tts attempt {attempt}/4...")
         try:
             subprocess.run(
                 [
@@ -229,7 +216,7 @@ def buat_suara(teks, output_audio):
             if os.path.exists(output_audio) and os.path.getsize(output_audio) > 1000:
                 break
         except Exception as e:
-            print(f"  -> edge-tts error: {e}")
+            print(f" -> edge-tts error: {e}")
             time.sleep(3)
 
     if not os.path.exists(output_audio) or os.path.getsize(output_audio) < 1000:
@@ -242,46 +229,37 @@ def buat_suara(teks, output_audio):
             "-of", "default=noprint_wrappers=1:nokey=1",
             output_audio,
         ],
-        capture_output=True,
-        text=True,
+        capture_output=True, text=True,
     )
     try:
         durasi = float(hasil_dur.stdout.strip())
         if durasi < 30:
             raise ValueError(f"Audio terlalu pendek ({durasi:.1f}s).")
         size_kb = os.path.getsize(output_audio) // 1024
-        print(f"  -> ✅ Audio OK: {durasi:.0f}s ({durasi/60:.1f} menit) — {size_kb} KB")
+        print(f" -> âœ… Audio OK: {durasi:.0f}s ({durasi/60:.1f} menit) â€” {size_kb} KB")
         return durasi
     except ValueError as e:
         raise ValueError(str(e))
 
 
-# ── Step 4: Render klip dengan Ken Burns + Watermark fix ─────
-
+# â”€â”€ Step 4: Render klip dengan Ken Burns + Watermark â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def render_satu_klip(args):
     i, img, font_sistem, output_klip = args
 
-    # 1. Scale + pad ke 1920x1080 dengan background hitam
     scale_pad = (
         "scale=1920:1080:force_original_aspect_ratio=decrease,"
         "pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=black"
     )
-
-    # 2. Ken Burns random
     kb = random.choice(KEN_BURNS)
-
-    # 3. FIX KRITIS: force format=yuv420p setelah zoompan
-    #    agar drawtext tidak gagal diam-diam
     filter_vf = f"{scale_pad},{kb},format=yuv420p"
 
-    # 4. Watermark — selalu tampil dengan background box
     if font_sistem:
         font_esc = escape_ffmpeg_path(font_sistem)
         x, y = random.choice([
-            ("30",        "30"),
-            ("w-tw-30",   "30"),
-            ("30",        "h-th-40"),
-            ("w-tw-30",   "h-th-40"),
+            ("30",      "30"),
+            ("w-tw-30", "30"),
+            ("30",      "h-th-40"),
+            ("w-tw-30", "h-th-40"),
         ])
         filter_vf += (
             f",drawtext=fontfile='{font_esc}'"
@@ -294,12 +272,11 @@ def render_satu_klip(args):
             f":boxborderw=8"
         )
     else:
-        # Fallback: drawtext tanpa fontfile, pakai font default FFmpeg
         x, y = random.choice([
-            ("30",        "30"),
-            ("w-tw-30",   "30"),
-            ("30",        "h-th-40"),
-            ("w-tw-30",   "h-th-40"),
+            ("30",      "30"),
+            ("w-tw-30", "30"),
+            ("30",      "h-th-40"),
+            ("w-tw-30", "h-th-40"),
         ])
         filter_vf += (
             f",drawtext=text='{NAMA_CHANNEL}'"
@@ -332,7 +309,7 @@ def render_satu_klip(args):
         or not os.path.exists(output_klip)
         or os.path.getsize(output_klip) < 1000
     ):
-        print(f"  -> [GAGAL] Klip {i} ({os.path.basename(img)}). Cek {FFMPEG_LOG}")
+        print(f" -> [GAGAL] Klip {i} ({os.path.basename(img)}). Cek {FFMPEG_LOG}")
         return None
     return i, output_klip
 
@@ -357,17 +334,16 @@ def proses_gambar(durasi_total_detik):
     random.shuffle(gambar_list)
 
     jumlah_klip = int(durasi_total_detik / 10) + 2
-    print(f"  -> Bank: {len(gambar_list)} gambar, 0 video")
-    print(f"  -> Target klip: {jumlah_klip}")
+    print(f" -> Bank: {len(gambar_list)} gambar, 0 video")
+    print(f" -> Target klip: {jumlah_klip}")
 
-    # Spread merata pakai modulo
     gambar_terpilih = [
         gambar_list[i % len(gambar_list)]
         for i in range(jumlah_klip)
     ]
 
     unik = len(set(gambar_terpilih))
-    print(f"  -> Gambar unik dipakai: {unik} dari {len(gambar_list)} tersedia")
+    print(f" -> Gambar unik dipakai: {unik} dari {len(gambar_list)} tersedia")
 
     font_sistem = siapkan_font_lokal()
     tasks = [
@@ -376,7 +352,7 @@ def proses_gambar(durasi_total_detik):
     ]
 
     klip_berhasil = {}
-    print(f"  -> Render {jumlah_klip} klip ({max_workers} thread)...")
+    print(f" -> Render {jumlah_klip} klip ({max_workers} thread)...")
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {executor.submit(render_satu_klip, t): t[0] for t in tasks}
@@ -386,11 +362,11 @@ def proses_gambar(durasi_total_detik):
                 idx, path = hasil
                 klip_berhasil[idx] = path
                 print(
-                    f"  -> {len(klip_berhasil)}/{jumlah_klip} klip selesai",
+                    f" -> {len(klip_berhasil)}/{jumlah_klip} klip selesai",
                     end="\r",
                 )
 
-    print(f"\n  -> {len(klip_berhasil)}/{jumlah_klip} klip berhasil dirender.")
+    print(f"\n -> {len(klip_berhasil)}/{jumlah_klip} klip berhasil dirender.")
 
     if not klip_berhasil:
         print(f"FATAL: Semua klip gagal! Buka '{FFMPEG_LOG}' untuk detail.")
@@ -405,8 +381,7 @@ def proses_gambar(durasi_total_detik):
     return list_txt
 
 
-# ── Step 5: Render final dengan xfade transition ──────────────
-
+# â”€â”€ Step 5: Render final dengan xfade transition â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def render_video_final(file_list, audio, output, durasi):
     print("[5/6] Merender video final dengan xfade transition...")
 
@@ -420,7 +395,7 @@ def render_video_final(file_list, audio, output, durasi):
                     klip_paths.append(path)
 
     if not klip_paths:
-        print("  -> ERROR: Tidak ada klip valid!")
+        print(" -> ERROR: Tidak ada klip valid!")
         return False
 
     if len(klip_paths) == 1:
@@ -443,9 +418,9 @@ def render_video_final(file_list, audio, output, durasi):
         trans_dipakai.append(trans)
         offset = round((i + 1) * (DURASI_KLIP - DURASI_TRANS), 2)
 
-        in_a = "[0:v]"  if i == 0                      else f"[vx{i-1}]"
+        in_a = "[0:v]"  if i == 0                    else f"[vx{i-1}]"
         in_b = f"[{i+1}:v]"
-        out  = "[vout]" if i == len(klip_paths) - 2    else f"[vx{i}]"
+        out  = "[vout]" if i == len(klip_paths) - 2  else f"[vx{i}]"
 
         filter_parts.append(
             f"{in_a}{in_b}xfade=transition={trans}"
@@ -461,7 +436,7 @@ def render_video_final(file_list, audio, output, durasi):
     filter_complex = ";".join(filter_parts)
     unik_trans     = list(set(trans_dipakai))
     print(
-        f"  -> {len(klip_paths)} klip, {len(trans_dipakai)} transisi: "
+        f" -> {len(klip_paths)} klip, {len(trans_dipakai)} transisi: "
         f"{', '.join(unik_trans[:5])}{'...' if len(unik_trans) > 5 else ''}"
     )
 
@@ -483,15 +458,15 @@ def render_video_final(file_list, audio, output, durasi):
         result = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=log)
 
     if result.returncode != 0:
-        print("  -> xfade gagal, fallback ke simple concat...")
+        print(" -> xfade gagal, fallback ke simple concat...")
         return _render_simple_concat(file_list, audio, output, durasi)
 
-    print("  -> ✅ Render final dengan xfade OK!")
+    print(" -> âœ… Render final dengan xfade OK!")
     return True
 
 
 def _render_simple_concat(file_list, audio, output, durasi):
-    print("  -> Mode fallback: simple concat...")
+    print(" -> Mode fallback: simple concat...")
     cmd = [
         "ffmpeg", "-y",
         "-f", "concat", "-safe", "0", "-i", file_list,
@@ -508,12 +483,29 @@ def _render_simple_concat(file_list, audio, output, durasi):
     return result.returncode == 0
 
 
-# ── Generate Thumbnail dari frame video ──────────────────────
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# FIX UTAMA: Generate Thumbnail dengan template thumb.py
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+def buat_thumbnail(info, judul, video_path, output_thumb="thumbnail.jpg"):
+    print(" -> Generate thumbnail...")
 
-def buat_thumbnail(video_path, output_thumb="thumbnail.jpg"):
-    print("  -> Generate thumbnail...")
+    # COBA DULU: pakai template thumb.py (ada teks, warna, harga)
+    try:
+        from thumb import buat_thumbnail as _thumb_fn
+        result = _thumb_fn(info, judul, output_thumb)
+        if result and os.path.exists(result) and os.path.getsize(result) > 10240:
+            size_kb = os.path.getsize(result) // 1024
+            print(f" -> âœ… Thumbnail OK: {result} ({size_kb} KB)")
+            return result
+        else:
+            print(" -> âš ï¸ thumb.py menghasilkan file kosong, coba fallback...")
+    except Exception as e:
+        print(f" -> âš ï¸ Template thumbnail gagal: {e}")
+        import traceback
+        traceback.print_exc()
 
-    # Ambil frame di detik ke-3 (biasanya frame paling bagus)
+    # FALLBACK: ambil frame dari video (tidak ada teks)
+    print(" -> Fallback: ambil frame dari video...")
     cmd_frame = [
         "ffmpeg", "-y",
         "-ss", "3",
@@ -526,18 +518,15 @@ def buat_thumbnail(video_path, output_thumb="thumbnail.jpg"):
         result = subprocess.run(cmd_frame, stdout=subprocess.DEVNULL, stderr=log)
 
     if result.returncode != 0 or not os.path.exists(output_thumb):
-        print("  -> [GAGAL] Generate thumbnail dari video.")
+        print(" -> [GAGAL] Generate thumbnail dari video.")
         return None
 
-    print(
-        f"  -> ✅ Thumbnail OK: {output_thumb} "
-        f"({os.path.getsize(output_thumb) // 1024} KB)"
-    )
+    size_kb = os.path.getsize(output_thumb) // 1024
+    print(f" -> âœ… Thumbnail OK (fallback frame): {output_thumb} ({size_kb} KB)")
     return output_thumb
 
 
-# ── Step 6: Upload ke YouTube + Thumbnail ────────────────────
-
+# â”€â”€ Step 6: Upload ke YouTube + Thumbnail â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def upload_ke_youtube(video_path, judul, deskripsi, tags, thumbnail_path=None):
     print("[6/6] Upload ke YouTube...")
     try:
@@ -551,10 +540,10 @@ def upload_ke_youtube(video_path, judul, deskripsi, tags, thumbnail_path=None):
         if token_env:
             with open(creds_file, "w") as f:
                 f.write(token_env)
-            print("  -> Token dari environment variable OK.")
+            print(" -> Token dari environment variable OK.")
 
         if not os.path.exists(creds_file):
-            print(f"  -> ERROR: File '{creds_file}' tidak ditemukan!")
+            print(f" -> ERROR: File '{creds_file}' tidak ditemukan!")
             return None
 
         with open(creds_file) as f:
@@ -578,7 +567,7 @@ def upload_ke_youtube(video_path, judul, deskripsi, tags, thumbnail_path=None):
                 "defaultLanguage": "id",
             },
             "status": {
-                "privacyStatus":           "public",
+                "privacyStatus":          "public",
                 "selfDeclaredMadeForKids": False,
             },
         }
@@ -592,23 +581,21 @@ def upload_ke_youtube(video_path, judul, deskripsi, tags, thumbnail_path=None):
             part="snippet,status", body=body, media_body=media
         )
 
-        # ── Upload video ──────────────────────────────────────
         response = None
         while response is None:
             status, response = request.next_chunk()
             if status:
                 print(
-                    f"  -> Upload video: {int(status.progress() * 100)}%",
+                    f" -> Upload video: {int(status.progress() * 100)}%",
                     end="\r",
                 )
 
         video_id = response.get("id")
-        print(f"\n  -> ✅ Upload video sukses! https://youtu.be/{video_id}")
+        print(f"\n -> âœ… Upload video sukses! https://youtu.be/{video_id}")
 
-        # ── Upload thumbnail ──────────────────────────────────
         if thumbnail_path and os.path.exists(thumbnail_path):
             size_kb = os.path.getsize(thumbnail_path) // 1024
-            print(f"  -> Upload thumbnail: {thumbnail_path} ({size_kb} KB)...")
+            print(f" -> Upload thumbnail: {thumbnail_path} ({size_kb} KB)...")
             try:
                 thumb_media = MediaFileUpload(
                     thumbnail_path,
@@ -619,14 +606,13 @@ def upload_ke_youtube(video_path, judul, deskripsi, tags, thumbnail_path=None):
                     videoId=video_id,
                     media_body=thumb_media,
                 ).execute()
-                print("  -> ✅ Thumbnail berhasil di-upload!")
+                print(" -> âœ… Thumbnail berhasil di-upload!")
             except Exception as e:
-                print(f"  -> ⚠️ Thumbnail gagal upload: {e}")
+                print(f" -> âš ï¸ Thumbnail gagal upload: {e}")
                 print("     (Video tetap OK, thumbnail pakai auto-generated YouTube)")
         else:
-            print("  -> ⚠️ Thumbnail tidak tersedia, pakai auto-generated YouTube.")
+            print(" -> âš ï¸ Thumbnail tidak tersedia, pakai auto-generated YouTube.")
 
-        # ── Simpan riwayat ────────────────────────────────────
         with open("upload_history.json", "a", encoding="utf-8") as f:
             json.dump(
                 {
@@ -635,19 +621,19 @@ def upload_ke_youtube(video_path, judul, deskripsi, tags, thumbnail_path=None):
                     "judul":     judul,
                     "thumbnail": thumbnail_path or "auto",
                 },
-                f, ensure_ascii=False,
+                f,
+                ensure_ascii=False,
             )
             f.write("\n")
 
         return video_id
 
     except Exception as e:
-        print(f"  -> Gagal upload YouTube: {e}")
+        print(f" -> Gagal upload YouTube: {e}")
         return None
 
 
-# ── Bersihkan file temp ───────────────────────────────────────
-
+# â”€â”€ Bersihkan file temp â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def bersihkan_temp(file_list, audio):
     print("[+] Membersihkan file sementara...")
     try:
@@ -659,11 +645,10 @@ def bersihkan_temp(file_list, audio):
         if os.path.exists("temp_clips"):
             os.rmdir("temp_clips")
     except Exception as e:
-        print(f"  -> Warning bersihkan: {e}")
+        print(f" -> Warning bersihkan: {e}")
 
 
-# ── MAIN ──────────────────────────────────────────────────────
-
+# â”€â”€ MAIN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async def main():
     with open(FFMPEG_LOG, "w", encoding="utf-8") as f:
         f.write(f"Log FFmpeg - {datetime.now()}\n{'='*60}\n")
@@ -698,7 +683,7 @@ async def main():
     try:
         durasi = buat_suara(narasi, audio_temp)
     except Exception as e:
-        print(f"  -> ERROR audio: {e}")
+        print(f" -> ERROR audio: {e}")
         return
 
     # 4. Render klip dengan Ken Burns
@@ -712,21 +697,21 @@ async def main():
 
     if sukses and os.path.exists(video_hasil):
         ukuran_mb = os.path.getsize(video_hasil) // 1024 // 1024
-        print(f"\n✅ VIDEO SELESAI: {video_hasil} ({ukuran_mb} MB)")
+        print(f"\nâœ… VIDEO SELESAI: {video_hasil} ({ukuran_mb} MB)")
 
         if ukuran_mb < 5:
-            print(f"⚠️ Ukuran video terlalu kecil. Buka '{FFMPEG_LOG}' untuk debug.")
+            print(f"âš ï¸ Ukuran video terlalu kecil. Buka '{FFMPEG_LOG}' untuk debug.")
             return
 
-        # Generate thumbnail dari frame video
-        thumbnail = buat_thumbnail(video_hasil, "thumbnail.jpg")
+        # FIX: Generate thumbnail pakai thumb.py (ada teks harga, warna template)
+        thumbnail = buat_thumbnail(info, judul, video_hasil, "thumbnail.jpg")
 
         # 6. Upload YouTube + Thumbnail
         deskripsi = (
             f"Update harga emas Antam hari ini "
             f"{datetime.now().strftime('%d %B %Y')}.\n\n"
             f"Harga 1 gram : Rp {info['harga_sekarang']:,}\n"
-            f"Status       : {info['status'].title()}\n\n"
+            f"Status       : {info['status']}\n\n"
             f"Informasi diambil langsung dari situs resmi Logam Mulia.\n\n"
             f"#HargaEmas #EmasAntam #InvestasiEmas #LogamMulia #EmasHariIni\n\n"
             f"Jangan lupa SUBSCRIBE dan aktifkan notifikasi!"
@@ -734,13 +719,12 @@ async def main():
 
         upload_ke_youtube(video_hasil, judul, deskripsi, YOUTUBE_TAGS, thumbnail)
 
-        # Bersihkan thumbnail setelah upload
         if thumbnail and os.path.exists(thumbnail):
             os.remove(thumbnail)
-            print("  -> Thumbnail temp dihapus.")
+            print(" -> Thumbnail temp dihapus.")
 
     else:
-        print(f"\n❌ GAGAL membuat video. Buka '{FFMPEG_LOG}' untuk detail.")
+        print(f"\nâŒ GAGAL membuat video. Buka '{FFMPEG_LOG}' untuk detail.")
 
 
 if __name__ == "__main__":

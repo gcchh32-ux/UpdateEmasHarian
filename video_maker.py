@@ -435,7 +435,7 @@ def render_video_final(file_list, audio, output, durasi):
     input_args.extend(["-i", audio])
     audio_idx = len(klip_paths)
 
-    filter_parts = []
+    filter_parts  = []
     trans_dipakai = []
 
     for i in range(len(klip_paths) - 1):
@@ -443,9 +443,9 @@ def render_video_final(file_list, audio, output, durasi):
         trans_dipakai.append(trans)
         offset = round((i + 1) * (DURASI_KLIP - DURASI_TRANS), 2)
 
-        in_a = "[0:v]"   if i == 0       else f"[vx{i-1}]"
+        in_a = "[0:v]"  if i == 0                      else f"[vx{i-1}]"
         in_b = f"[{i+1}:v]"
-        out  = "[vout]"  if i == len(klip_paths) - 2 else f"[vx{i}]"
+        out  = "[vout]" if i == len(klip_paths) - 2    else f"[vx{i}]"
 
         filter_parts.append(
             f"{in_a}{in_b}xfade=transition={trans}"
@@ -459,7 +459,7 @@ def render_video_final(file_list, audio, output, durasi):
     )
 
     filter_complex = ";".join(filter_parts)
-    unik_trans = list(set(trans_dipakai))
+    unik_trans     = list(set(trans_dipakai))
     print(
         f"  -> {len(klip_paths)} klip, {len(trans_dipakai)} transisi: "
         f"{', '.join(unik_trans[:5])}{'...' if len(unik_trans) > 5 else ''}"
@@ -508,9 +508,37 @@ def _render_simple_concat(file_list, audio, output, durasi):
     return result.returncode == 0
 
 
-# ── Step 6: Upload ke YouTube ─────────────────────────────────
+# ── Generate Thumbnail dari frame video ──────────────────────
 
-def upload_ke_youtube(video_path, judul, deskripsi, tags):
+def buat_thumbnail(video_path, output_thumb="thumbnail.jpg"):
+    print("  -> Generate thumbnail...")
+
+    # Ambil frame di detik ke-3 (biasanya frame paling bagus)
+    cmd_frame = [
+        "ffmpeg", "-y",
+        "-ss", "3",
+        "-i", video_path,
+        "-vframes", "1",
+        "-q:v", "2",
+        output_thumb,
+    ]
+    with open(FFMPEG_LOG, "a", encoding="utf-8") as log:
+        result = subprocess.run(cmd_frame, stdout=subprocess.DEVNULL, stderr=log)
+
+    if result.returncode != 0 or not os.path.exists(output_thumb):
+        print("  -> [GAGAL] Generate thumbnail dari video.")
+        return None
+
+    print(
+        f"  -> ✅ Thumbnail OK: {output_thumb} "
+        f"({os.path.getsize(output_thumb) // 1024} KB)"
+    )
+    return output_thumb
+
+
+# ── Step 6: Upload ke YouTube + Thumbnail ────────────────────
+
+def upload_ke_youtube(video_path, judul, deskripsi, tags, thumbnail_path=None):
     print("[6/6] Upload ke YouTube...")
     try:
         from google.oauth2.credentials import Credentials
@@ -564,20 +592,49 @@ def upload_ke_youtube(video_path, judul, deskripsi, tags):
             part="snippet,status", body=body, media_body=media
         )
 
+        # ── Upload video ──────────────────────────────────────
         response = None
         while response is None:
             status, response = request.next_chunk()
             if status:
-                print(f"  -> Upload: {int(status.progress() * 100)}%", end="\r")
+                print(
+                    f"  -> Upload video: {int(status.progress() * 100)}%",
+                    end="\r",
+                )
 
         video_id = response.get("id")
-        print(f"\n  -> ✅ Upload sukses! https://youtu.be/{video_id}")
+        print(f"\n  -> ✅ Upload video sukses! https://youtu.be/{video_id}")
 
+        # ── Upload thumbnail ──────────────────────────────────
+        if thumbnail_path and os.path.exists(thumbnail_path):
+            size_kb = os.path.getsize(thumbnail_path) // 1024
+            print(f"  -> Upload thumbnail: {thumbnail_path} ({size_kb} KB)...")
+            try:
+                thumb_media = MediaFileUpload(
+                    thumbnail_path,
+                    mimetype="image/jpeg",
+                    resumable=False,
+                )
+                youtube.thumbnails().set(
+                    videoId=video_id,
+                    media_body=thumb_media,
+                ).execute()
+                print("  -> ✅ Thumbnail berhasil di-upload!")
+            except Exception as e:
+                print(f"  -> ⚠️ Thumbnail gagal upload: {e}")
+                print("     (Video tetap OK, thumbnail pakai auto-generated YouTube)")
+        else:
+            print("  -> ⚠️ Thumbnail tidak tersedia, pakai auto-generated YouTube.")
+
+        # ── Simpan riwayat ────────────────────────────────────
         with open("upload_history.json", "a", encoding="utf-8") as f:
             json.dump(
-                {"tanggal":  datetime.now().isoformat(),
-                 "video_id": video_id,
-                 "judul":    judul},
+                {
+                    "tanggal":   datetime.now().isoformat(),
+                    "video_id":  video_id,
+                    "judul":     judul,
+                    "thumbnail": thumbnail_path or "auto",
+                },
                 f, ensure_ascii=False,
             )
             f.write("\n")
@@ -661,7 +718,10 @@ async def main():
             print(f"⚠️ Ukuran video terlalu kecil. Buka '{FFMPEG_LOG}' untuk debug.")
             return
 
-        # 6. Upload YouTube
+        # Generate thumbnail dari frame video
+        thumbnail = buat_thumbnail(video_hasil, "thumbnail.jpg")
+
+        # 6. Upload YouTube + Thumbnail
         deskripsi = (
             f"Update harga emas Antam hari ini "
             f"{datetime.now().strftime('%d %B %Y')}.\n\n"
@@ -672,7 +732,13 @@ async def main():
             f"Jangan lupa SUBSCRIBE dan aktifkan notifikasi!"
         ).replace(",", ".")
 
-        upload_ke_youtube(video_hasil, judul, deskripsi, YOUTUBE_TAGS)
+        upload_ke_youtube(video_hasil, judul, deskripsi, YOUTUBE_TAGS, thumbnail)
+
+        # Bersihkan thumbnail setelah upload
+        if thumbnail and os.path.exists(thumbnail):
+            os.remove(thumbnail)
+            print("  -> Thumbnail temp dihapus.")
+
     else:
         print(f"\n❌ GAGAL membuat video. Buka '{FFMPEG_LOG}' untuk detail.")
 

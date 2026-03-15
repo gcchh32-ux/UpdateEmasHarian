@@ -35,7 +35,7 @@ import requests
 from bs4 import BeautifulSoup
 
 # ── Import dari modul terpisah ────────────────────────────────
-from narasi import buat_narasi as buat_narasi_dan_judul
+from narasi import buat_narasi_dan_judul
 from store  import kelola_bank_gambar, kelola_bank_video, kelola_video_lama
 
 # ============================================================

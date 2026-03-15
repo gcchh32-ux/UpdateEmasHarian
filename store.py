@@ -65,29 +65,48 @@ def list_video_bank():
 def kelola_bank_gambar():
     os.makedirs(FOLDER_GAMBAR, exist_ok=True)
 
+    # Hapus semua gambar lama
     for f in list_gambar():
         try:
             os.remove(f)
         except Exception:
             pass
 
-    log("[STORAGE] Download 2 gambar baru (keyword berbeda)...")
-    _download_gambar_pexels(2)
+    # FIX: pakai JUMLAH_DL_GAMBAR dari config, bukan hardcode 2
+    log(f"[STORAGE] Download {JUMLAH_DL_GAMBAR} gambar baru (keyword berbeda)...")
+    _download_gambar_pexels(JUMLAH_DL_GAMBAR)
 
     ada = list_gambar()
 
-    if len(ada) < 2:
-        log(f"[STORAGE] Pexels kurang ({len(ada)}), coba Pixabay...")
-        _download_gambar_pixabay(2 - len(ada))
+    # Fallback Pixabay jika Pexels kurang dari JUMLAH_GAMBAR_MIN
+    if len(ada) < JUMLAH_GAMBAR_MIN:
+        kurang = JUMLAH_DL_GAMBAR - len(ada)
+        log(f"[STORAGE] Pexels kurang ({len(ada)}/{JUMLAH_GAMBAR_MIN}), coba Pixabay ({kurang} lagi)...")
+        _download_gambar_pixabay(kurang)
         ada = list_gambar()
 
-    # Kalau masih cuma 1, duplikasi agar render tidak gagal
-    if len(ada) == 1:
+    # Masih kurang? duplikasi agar render tidak gagal
+    if len(ada) < JUMLAH_GAMBAR_MIN and len(ada) > 0:
         import shutil
-        dst = ada[0].replace(".jpg", "_dup.jpg").replace(".jpeg", "_dup.jpeg").replace(".png", "_dup.png")
-        shutil.copy(ada[0], dst)
+        log(f"[STORAGE] Masih kurang ({len(ada)}), duplikasi gambar yang ada...")
+        base_list = list_gambar()
+        idx = 0
+        while len(list_gambar()) < JUMLAH_GAMBAR_MIN:
+            src = base_list[idx % len(base_list)]
+            ext = os.path.splitext(src)[1]
+            dst = f"{FOLDER_GAMBAR}/dup_{int(time.time())}_{idx}{ext}"
+            if not os.path.exists(dst):
+                shutil.copy(src, dst)
+            idx += 1
         ada = list_gambar()
-        log(f"[STORAGE] Hanya 1 gambar tersedia, diduplikasi.")
+        log(f"[STORAGE] Setelah duplikasi: {len(ada)} gambar")
+
+    # Fallback darurat: tidak ada gambar sama sekali
+    if len(ada) == 0:
+        log("[STORAGE] ⚠️ Tidak ada gambar! Coba download ulang semua keyword...")
+        _download_gambar_pexels(JUMLAH_DL_GAMBAR)
+        _download_gambar_pixabay(JUMLAH_DL_GAMBAR)
+        ada = list_gambar()
 
     log(f"[STORAGE] Bank gambar siap: {len(ada)} gambar")
     return ada
@@ -100,15 +119,21 @@ def _download_gambar_pexels(jumlah):
 
     headers = {"Authorization": PEXELS_API_KEY}
 
-    # Acak SEMUA keyword — coba satu per satu sampai dapat 'jumlah' gambar
-    # Ini fix utama: tidak berhenti di 2 keyword saja
+    # Acak semua keyword, coba satu per satu sampai dapat 'jumlah' gambar
     kw_semua = KATA_KUNCI_GAMBAR.copy()
     random.shuffle(kw_semua)
+
+    # FIX: jika keyword tidak cukup, ulang pakai semua keyword lagi
+    # Misal jumlah=20 tapi keyword cuma 8, putar ulang keyword
+    kw_pool = []
+    while len(kw_pool) < jumlah:
+        kw_pool.extend(kw_semua)
+    kw_pool = kw_pool[:jumlah * 2]  # cadangan 2x supaya ada ruang skip
 
     ts    = int(time.time())
     total = 0
 
-    for kw in kw_semua:
+    for kw in kw_pool:
         if total >= jumlah:
             break
 
@@ -128,7 +153,7 @@ def _download_gambar_pexels(jumlah):
             fotos = resp.json().get("photos", [])
 
             dapat = False
-            for i, foto in enumerate(fotos):
+            for foto in fotos:
                 if (foto.get("width",  0) < 1200 or
                         foto.get("height", 0) < 800):
                     continue
@@ -173,10 +198,13 @@ def _download_gambar_pixabay(jumlah):
         log("  -> PIXABAY_API_KEY kosong, skip!")
         return
 
-    kw_pool  = random.sample(
-        PIXABAY_KEYWORDS,
-        min(jumlah, len(PIXABAY_KEYWORDS))
-    )
+    # FIX: putar keyword jika jumlah > panjang PIXABAY_KEYWORDS
+    kw_pool = []
+    while len(kw_pool) < jumlah:
+        kw_pool.extend(PIXABAY_KEYWORDS)
+    kw_pool = kw_pool[:jumlah * 2]
+    random.shuffle(kw_pool)
+
     ts    = int(time.time()) + 9999
     total = 0
 
@@ -202,7 +230,7 @@ def _download_gambar_pixabay(jumlah):
             resp.raise_for_status()
             hits = resp.json().get("hits", [])
 
-            for i, hit in enumerate(hits):
+            for hit in hits:
                 tags = hit.get("tags", "")
                 url  = hit.get("largeImageURL", "")
                 if not url:

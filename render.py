@@ -19,8 +19,8 @@ from store import list_gambar, list_video_bank
 def buat_suara(teks, output_audio):
     from config import VOICE, VOICE_RATE
     import re, asyncio, threading
-
     log("[3/6] Generate suara...")
+
     teks_bersih = re.sub(
         r'\[.*?\]|\(.*?\)|\*.*?\*|'
         r'[▲▼⬛📊📈📉💰🔥💥🚨🎯⚡😲🤔💡🛒🔴🟢⚠️📅💛]',
@@ -28,7 +28,6 @@ def buat_suara(teks, output_audio):
     ).strip()
     teks_bersih = re.sub(r'\n+', ' ', teks_bersih)
     teks_bersih = re.sub(r'\s+', ' ', teks_bersih).strip()
-
     log(f"  -> Panjang teks: {len(teks_bersih)} karakter")
 
     async def _generate():
@@ -40,39 +39,48 @@ def buat_suara(teks, output_audio):
         )
         await communicate.save(output_audio)
 
-    error_container = []
+    MAX_ATTEMPT = 4
+    for attempt in range(1, MAX_ATTEMPT + 1):
+        log(f"  -> edge-tts attempt {attempt}/{MAX_ATTEMPT}...")
+        error_container = []
 
-    def _run_in_thread():
-        try:
-            asyncio.run(_generate())
-        except Exception as e:
-            error_container.append(e)
+        def _run_in_thread():
+            try:
+                asyncio.run(_generate())
+            except Exception as e:
+                error_container.append(e)
 
-    t = threading.Thread(target=_run_in_thread)
-    t.start()
-    t.join(timeout=120)
+        t = threading.Thread(target=_run_in_thread)
+        t.start()
+        t.join(timeout=240)
 
-    if t.is_alive():
-        raise RuntimeError("edge-tts timeout (>120s)!")
-    if error_container:
-        raise RuntimeError(
-            f"edge-tts gagal: {error_container[0]}"
-        )
-    if not ffmpeg_is_valid(output_audio, min_size_kb=5):
-        raise FileNotFoundError(
-            "File audio tidak terbuat atau terlalu kecil!"
-        )
+        if t.is_alive():
+            log(f"  -> Timeout attempt {attempt}, tunggu 15s lalu coba lagi...")
+            if attempt < MAX_ATTEMPT:
+                time.sleep(15)
+            continue
 
-    durasi  = ffmpeg_duration(output_audio)
-    size_kb = os.path.getsize(output_audio) // 1024
-    log(f"  -> ✅ Audio OK: {durasi:.0f}s "
-        f"({durasi/60:.1f} menit) — {size_kb} KB")
+        if error_container:
+            log(f"  -> Error: {error_container[0]}, tunggu 10s lalu coba lagi...")
+            if attempt < MAX_ATTEMPT:
+                time.sleep(10)
+            continue
 
-    if durasi < 30:
-        raise ValueError(
-            f"Audio terlalu pendek ({durasi:.1f}s)!"
-        )
-    return durasi
+        if not ffmpeg_is_valid(output_audio, min_size_kb=5):
+            log(f"  -> Audio tidak valid attempt {attempt}, coba lagi...")
+            if attempt < MAX_ATTEMPT:
+                time.sleep(10)
+            continue
+
+        durasi = ffmpeg_duration(output_audio)
+        size_kb = os.path.getsize(output_audio) // 1024
+        log(f"  -> ✅ Audio OK: {durasi:.0f}s ({durasi/60:.1f} menit) — {size_kb} KB")
+        if durasi < 30:
+            raise ValueError(f"Audio terlalu pendek ({durasi:.1f}s)!")
+        return durasi
+
+    raise RuntimeError(f"edge-tts gagal setelah {MAX_ATTEMPT} percobaan!")
+
 
 
 # ════════════════════════════════════════════════════════════
@@ -353,26 +361,26 @@ def proses_semua_klip(durasi_total_detik):
 
     # ── Gambar — pakai TEPAT 2 gambar, alternasi ─────────
     if n_gambar > 0 and gambar_list:
-        # Ambil 2 gambar berbeda secara random
-        dua_img = random.sample(
-            gambar_list, min(2, len(gambar_list))
-        )
-        if len(dua_img) == 1:
-            dua_img = dua_img * 2   # duplikasi jika hanya 1
-
+        # Gunakan semua gambar yang tersedia, acak urutannya
+        pool_img = gambar_list.copy()
+        random.shuffle(pool_img)
+        # Extend pool kalau gambar kurang dari jumlah klip yang dibutuhkan
+        while len(pool_img) < n_gambar:
+            extra = gambar_list.copy()
+            random.shuffle(extra)
+            pool_img.extend(extra)
         last_kb = None
         for j in range(n_gambar):
-            img = dua_img[j % 2]   # alternasi gambar 1 & 2
+            img = pool_img[j % len(pool_img)]
             out = os.path.abspath(
                 f"temp_clips/klip_{counter:04d}.mp4"
             )
-            # Kirim last_kb agar fungsi render bisa hindari duplikasi
             tasks.append(
                 ('gambar', counter, img, fp, out, last_kb)
             )
-            # Perbarui last_kb (estimasi — akan diperbarui setelah render)
             last_kb = (last_kb % 6 + 1) if last_kb else 1
             counter += 1
+
 
     random.shuffle(tasks)
 

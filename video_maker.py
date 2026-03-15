@@ -47,31 +47,33 @@ from config import (
 
 FFMPEG_LOG = "ffmpeg_log.txt"
 
+
 # ════════════════════════════════════════════════════════════
-# KEN BURNS EFFECT - 10 variasi gerakan kamera
+# KEN BURNS - 10 variasi gerakan kamera
 # ════════════════════════════════════════════════════════════
 KEN_BURNS = [
     # 1. Zoom in perlahan dari tengah
     "zoompan=z='min(zoom+0.0015,1.5)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=300:s=1920x1080:fps=30",
-    # 2. Zoom out dari 1.5 ke 1.0 (mundur)
+    # 2. Zoom out dari 1.5 ke 1.0
     "zoompan=z='if(eq(on,1),1.5,max(1.001,zoom-0.0015))':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=300:s=1920x1080:fps=30",
-    # 3. Geser kiri ke kanan + zoom ringan
+    # 3. Pan kiri ke kanan + zoom ringan
     "zoompan=z='1.3':x='if(eq(on,1),0,min(iw-iw/zoom,x+2))':y='ih/2-(ih/zoom/2)':d=300:s=1920x1080:fps=30",
-    # 4. Geser kanan ke kiri
+    # 4. Pan kanan ke kiri
     "zoompan=z='1.3':x='if(eq(on,1),iw-iw/zoom,max(0,x-2))':y='ih/2-(ih/zoom/2)':d=300:s=1920x1080:fps=30",
-    # 5. Geser atas ke bawah
+    # 5. Pan atas ke bawah
     "zoompan=z='1.3':x='iw/2-(iw/zoom/2)':y='if(eq(on,1),0,min(ih-ih/zoom,y+1.5))':d=300:s=1920x1080:fps=30",
-    # 6. Geser bawah ke atas
+    # 6. Pan bawah ke atas
     "zoompan=z='1.3':x='iw/2-(iw/zoom/2)':y='if(eq(on,1),ih-ih/zoom,max(0,y-1.5))':d=300:s=1920x1080:fps=30",
-    # 7. Zoom in + geser diagonal kiri atas
+    # 7. Zoom in + diagonal kiri atas
     "zoompan=z='min(zoom+0.001,1.4)':x='if(eq(on,1),0,min(iw-iw/zoom,x+1.5))':y='if(eq(on,1),0,min(ih-ih/zoom,y+0.8))':d=300:s=1920x1080:fps=30",
-    # 8. Zoom in + geser diagonal kanan bawah
+    # 8. Zoom in + diagonal kanan bawah
     "zoompan=z='min(zoom+0.001,1.4)':x='if(eq(on,1),iw-iw/zoom,max(0,x-1.5))':y='if(eq(on,1),ih-ih/zoom,max(0,y-0.8))':d=300:s=1920x1080:fps=30",
     # 9. Zoom in lembut + geser kanan
     "zoompan=z='min(zoom+0.0008,1.25)':x='if(eq(on,1),0,min(iw-iw/zoom,x+1))':y='ih/2-(ih/zoom/2)':d=300:s=1920x1080:fps=30",
     # 10. Zoom out + geser kiri
     "zoompan=z='if(eq(on,1),1.3,max(1.001,zoom-0.001))':x='if(eq(on,1),iw-iw/zoom,max(0,x-1))':y='ih/2-(ih/zoom/2)':d=300:s=1920x1080:fps=30",
 ]
+
 
 # ════════════════════════════════════════════════════════════
 # XFADE TRANSITIONS - 28 jenis transisi random
@@ -118,7 +120,7 @@ def siapkan_font_lokal():
                 return font_lokal
             except Exception:
                 continue
-    print("  -> PERINGATAN: Font tidak ditemukan. Watermark dinonaktifkan.")
+    print("  -> PERINGATAN: Font tidak ditemukan, pakai font default FFmpeg.")
     return None
 
 
@@ -254,30 +256,59 @@ def buat_suara(teks, output_audio):
         raise ValueError(str(e))
 
 
-# ── Step 4: Render klip dengan Ken Burns ─────────────────────
+# ── Step 4: Render klip dengan Ken Burns + Watermark fix ─────
 
 def render_satu_klip(args):
     i, img, font_sistem, output_klip = args
 
-    # Scale + pad ke 1920x1080 lalu Ken Burns random
-    kb       = random.choice(KEN_BURNS)
+    # 1. Scale + pad ke 1920x1080 dengan background hitam
     scale_pad = (
         "scale=1920:1080:force_original_aspect_ratio=decrease,"
-        "pad=1920:1080:(ow-iw)/2:(oh-ih)/2"
+        "pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=black"
     )
-    filter_vf = f"{scale_pad},{kb}"
 
-    # Watermark
+    # 2. Ken Burns random
+    kb = random.choice(KEN_BURNS)
+
+    # 3. FIX KRITIS: force format=yuv420p setelah zoompan
+    #    agar drawtext tidak gagal diam-diam
+    filter_vf = f"{scale_pad},{kb},format=yuv420p"
+
+    # 4. Watermark — selalu tampil dengan background box
     if font_sistem:
         font_esc = escape_ffmpeg_path(font_sistem)
         x, y = random.choice([
-            ("30", "30"), ("w-tw-30", "30"),
-            ("30", "h-th-30"), ("w-tw-30", "h-th-30"),
+            ("30",        "30"),
+            ("w-tw-30",   "30"),
+            ("30",        "h-th-40"),
+            ("w-tw-30",   "h-th-40"),
         ])
         filter_vf += (
             f",drawtext=fontfile='{font_esc}'"
             f":text='{NAMA_CHANNEL}'"
-            f":fontcolor=white@0.7:fontsize=30:x={x}:y={y}"
+            f":fontcolor=white"
+            f":fontsize=32"
+            f":x={x}:y={y}"
+            f":box=1"
+            f":boxcolor=black@0.45"
+            f":boxborderw=8"
+        )
+    else:
+        # Fallback: drawtext tanpa fontfile, pakai font default FFmpeg
+        x, y = random.choice([
+            ("30",        "30"),
+            ("w-tw-30",   "30"),
+            ("30",        "h-th-40"),
+            ("w-tw-30",   "h-th-40"),
+        ])
+        filter_vf += (
+            f",drawtext=text='{NAMA_CHANNEL}'"
+            f":fontcolor=white"
+            f":fontsize=32"
+            f":x={x}:y={y}"
+            f":box=1"
+            f":boxcolor=black@0.45"
+            f":boxborderw=8"
         )
 
     cmd = [
@@ -326,7 +357,7 @@ def proses_gambar(durasi_total_detik):
     random.shuffle(gambar_list)
 
     jumlah_klip = int(durasi_total_detik / 10) + 2
-    print(f"  -> Bank: {len(gambar_list)} gambar tersedia")
+    print(f"  -> Bank: {len(gambar_list)} gambar, 0 video")
     print(f"  -> Target klip: {jumlah_klip}")
 
     # Spread merata pakai modulo
@@ -354,7 +385,10 @@ def proses_gambar(durasi_total_detik):
             if hasil:
                 idx, path = hasil
                 klip_berhasil[idx] = path
-                print(f"  -> {len(klip_berhasil)}/{jumlah_klip} klip selesai", end="\r")
+                print(
+                    f"  -> {len(klip_berhasil)}/{jumlah_klip} klip selesai",
+                    end="\r",
+                )
 
     print(f"\n  -> {len(klip_berhasil)}/{jumlah_klip} klip berhasil dirender.")
 
@@ -376,7 +410,6 @@ def proses_gambar(durasi_total_detik):
 def render_video_final(file_list, audio, output, durasi):
     print("[5/6] Merender video final dengan xfade transition...")
 
-    # Baca daftar klip dari concat file
     klip_paths = []
     with open(file_list, "r", encoding="utf-8") as f:
         for line in f:
@@ -390,40 +423,36 @@ def render_video_final(file_list, audio, output, durasi):
         print("  -> ERROR: Tidak ada klip valid!")
         return False
 
-    # Fallback simple concat jika hanya 1 klip
     if len(klip_paths) == 1:
         return _render_simple_concat(file_list, audio, output, durasi)
 
     DURASI_KLIP  = 10.0
-    DURASI_TRANS = 0.8  # durasi setiap transisi (detik)
+    DURASI_TRANS = 0.8
 
-    # Build input args: semua klip + audio di akhir
     input_args = []
     for path in klip_paths:
         input_args.extend(["-i", path])
     input_args.extend(["-i", audio])
     audio_idx = len(klip_paths)
 
-    # Build xfade filtergraph chain
     filter_parts = []
     trans_dipakai = []
 
     for i in range(len(klip_paths) - 1):
-        trans   = random.choice(XFADE_TRANSITIONS)
+        trans  = random.choice(XFADE_TRANSITIONS)
         trans_dipakai.append(trans)
-        offset  = round((i + 1) * (DURASI_KLIP - DURASI_TRANS), 2)
+        offset = round((i + 1) * (DURASI_KLIP - DURASI_TRANS), 2)
 
-        in_a = "[0:v]"    if i == 0 else f"[vx{i-1}]"
+        in_a = "[0:v]"   if i == 0       else f"[vx{i-1}]"
         in_b = f"[{i+1}:v]"
-        out  = "[vout]"   if i == len(klip_paths) - 2 else f"[vx{i}]"
+        out  = "[vout]"  if i == len(klip_paths) - 2 else f"[vx{i}]"
 
         filter_parts.append(
             f"{in_a}{in_b}xfade=transition={trans}"
             f":duration={DURASI_TRANS}:offset={offset}{out}"
         )
 
-    # Tambah fade in di awal dan fade out di akhir
-    fade_out_st = round(min(durasi - 1.5, durasi - 1.5), 2)
+    fade_out_st = round(durasi - 1.5, 2)
     filter_parts.append(
         f"[vout]fade=t=in:st=0:d=0.8,"
         f"fade=t=out:st={fade_out_st}:d=1.0[vfinal]"
@@ -431,7 +460,10 @@ def render_video_final(file_list, audio, output, durasi):
 
     filter_complex = ";".join(filter_parts)
     unik_trans = list(set(trans_dipakai))
-    print(f"  -> {len(klip_paths)} klip, {len(trans_dipakai)} transisi: {', '.join(unik_trans[:5])}{'...' if len(unik_trans) > 5 else ''}")
+    print(
+        f"  -> {len(klip_paths)} klip, {len(trans_dipakai)} transisi: "
+        f"{', '.join(unik_trans[:5])}{'...' if len(unik_trans) > 5 else ''}"
+    )
 
     cmd = [
         "ffmpeg", "-y",
@@ -459,7 +491,6 @@ def render_video_final(file_list, audio, output, durasi):
 
 
 def _render_simple_concat(file_list, audio, output, durasi):
-    """Fallback: concat biasa tanpa xfade."""
     print("  -> Mode fallback: simple concat...")
     cmd = [
         "ffmpeg", "-y",
@@ -544,9 +575,9 @@ def upload_ke_youtube(video_path, judul, deskripsi, tags):
 
         with open("upload_history.json", "a", encoding="utf-8") as f:
             json.dump(
-                {"tanggal": datetime.now().isoformat(),
+                {"tanggal":  datetime.now().isoformat(),
                  "video_id": video_id,
-                 "judul": judul},
+                 "judul":    judul},
                 f, ensure_ascii=False,
             )
             f.write("\n")

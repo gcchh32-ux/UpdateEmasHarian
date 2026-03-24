@@ -37,10 +37,10 @@ def _tgl_id(x):
     return x
 
 GEMINI_MODELS = [
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
     "gemini-2.0-flash",
-    "gemini-1.5-flash",
-    "gemini-1.5-flash-8b",
-    "gemini-1.0-pro",
+    "gemini-2.0-flash-lite",
 ]
 GEMINI_BASE = (
     "https://generativelanguage.googleapis.com/v1beta/"
@@ -48,10 +48,10 @@ GEMINI_BASE = (
 )
 
 OPENROUTER_MODELS = [
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "google/gemini-2.0-flash-exp:free",
-    "deepseek/deepseek-r1:free",
-    "mistralai/mistral-7b-instruct:free",
+    "meta-llama/llama-3.3-70b-instruct",
+    "google/gemini-2.0-flash-001",
+    "deepseek/deepseek-chat",
+    "mistralai/mistral-small",
 ]
 
 

@@ -44,7 +44,7 @@ from config import (
     YOUTUBE_CATEGORY,
     YOUTUBE_TAGS,
 )
-
+from scrape import ambil_harga_emas
 FFMPEG_LOG = "ffmpeg_log.txt"
 
 
@@ -667,8 +667,10 @@ async def main():
     kelola_video_lama()
 
     # 1. Scrape harga emas
-    info = scrape_dan_kalkulasi_harga()
-    if not info:
+    try:
+        info = ambil_harga_emas()
+    except Exception as e:
+        print(f" -> ERROR: {e}")
         print("Scraping gagal. Menghentikan proses.")
         return
 

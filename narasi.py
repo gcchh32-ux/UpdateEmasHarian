@@ -714,7 +714,7 @@ def buat_narasi_dan_judul(info):
 
     judul, narasi = _parse_output(raw)
 
-    if not narasi or len(narasi.strip()) < 200:
+    if not narasi or len(narasi.split()) < 300:  # FIX: cek kata bukan karakter
         log("  -> Output API terlalu pendek, pakai fallback")
         judul, narasi = _buat_narasi_fallback(info)
 

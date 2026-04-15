@@ -233,10 +233,13 @@ def buat_suara(teks, output_audio):
     )
     try:
         durasi = float(hasil_dur.stdout.strip())
+        if durasi < 10:
+            raise ValueError(f"Audio terlalu pendek ({durasi:.1f}s), TTS gagal total.")
         if durasi < 30:
-            raise ValueError(f"Audio terlalu pendek ({durasi:.1f}s).")
+            print(f" -> Audio pendek ({durasi:.1f}s) - retry narasi lebih panjang")
+            return -durasi  # sinyal negatif ke main() untuk retry
         size_kb = os.path.getsize(output_audio) // 1024
-        print(f" -> âœ… Audio OK: {durasi:.0f}s ({durasi/60:.1f} menit) â€” {size_kb} KB")
+        print(f" -> Audio OK: {durasi:.0f}s ({durasi/60:.1f} menit) - {size_kb} KB")
         return durasi
     except ValueError as e:
         raise ValueError(str(e))
@@ -681,12 +684,38 @@ async def main():
     print(f" JUDUL: {judul}")
     print(f"{'='*60}\n")
 
-    # 3. Generate suara
-    try:
-        durasi = buat_suara(narasi, audio_temp)
-    except Exception as e:
-        print(f" -> ERROR audio: {e}")
+    # 3. Generate suara - retry otomatis jika narasi terlalu pendek
+    durasi     = None
+    durasi_raw = None
+    for audio_attempt in range(1, 4):
+        if audio_attempt > 1:
+            print(f"\n -> [RETRY {audio_attempt}/3] Minta narasi lebih panjang ke AI...")
+            try:
+                info["_minta_panjang"] = True
+                judul, narasi = buat_narasi_dan_judul(info)
+                print(f" -> Narasi baru: {len(narasi.split())} kata / {len(narasi)} karakter")
+            except Exception as e:
+                print(f" -> Gagal generate narasi baru: {e}")
+                break
+        try:
+            if os.path.exists(audio_temp):
+                os.remove(audio_temp)
+            durasi_raw = buat_suara(narasi, audio_temp)
+            if durasi_raw is not None and durasi_raw < 0:
+                print(f" -> Audio {abs(durasi_raw):.1f}s, coba narasi lebih panjang...")
+                durasi = abs(durasi_raw)
+                continue
+            durasi = durasi_raw
+            break
+        except Exception as e:
+            print(f" -> ERROR audio: {e}")
+            break
+
+    if not durasi:
+        print("Gagal generate audio. Menghentikan proses.")
         return
+    durasi = abs(durasi)  # pakai walau pendek daripada tidak upload sama sekali
+    print(f" -> Lanjut dengan durasi audio: {durasi:.1f}s")
 
     # 4. Render klip dengan Ken Burns
     file_list = proses_gambar(durasi)
